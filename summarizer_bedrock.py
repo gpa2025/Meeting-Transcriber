@@ -5,6 +5,13 @@ This module provides functions to:
 1. Connect to AWS Bedrock service
 2. Generate detailed meeting summaries using large language models
 3. Parse and structure the AI responses
+
+Author: Gianpaolo Albanese
+E-Mail: albaneg@yahoo.com
+Work Email: gianpaoa@amazon.com
+Date: 05-09-2024
+Version: 1.0
+Assisted by: Amazon Q for VS Code
 """
 
 import os
@@ -197,8 +204,7 @@ def create_bedrock_prompt(transcript, system_prompt, model_id):
                 
             {transcript}
                 
-            Assistant:
-                """
+            Assistant:"""
     else:
         # Generic prompt format for other models
         prompt = f"""{system_prompt}

@@ -1,3 +1,16 @@
+"""
+Meeting Transcriber GUI Application
+
+This module provides a graphical user interface for the Meeting Transcriber application.
+
+Author: Gianpaolo Albanese
+E-Mail: albaneg@yahoo.com
+Work Email: gianpaoa@amazon.com
+Date: 05-09-2024
+Version: 1.0
+Assisted by: Amazon Q for VS Code
+"""
+
 import os
 import sys
 import json
@@ -227,8 +240,11 @@ class MeetingTranscriberGUI(QMainWindow):
         self.save_settings_button.clicked.connect(self.save_settings)
         self.start_button = QPushButton("Start Transcription")
         self.start_button.clicked.connect(self.start_transcription)
+        self.about_button = QPushButton("About")
+        self.about_button.clicked.connect(self.show_about)
         button_layout.addWidget(self.save_settings_button)
         button_layout.addWidget(self.start_button)
+        button_layout.addWidget(self.about_button)
         
         # Add all groups to main layout
         main_layout.addWidget(aws_group)
@@ -351,6 +367,21 @@ class MeetingTranscriberGUI(QMainWindow):
             QMessageBox.information(self, "Settings Saved", "Settings have been saved successfully!")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save settings: {str(e)}")
+    
+    def show_about(self):
+        """Show the About dialog with author information"""
+        about_text = """
+        <h2>Meeting Transcriber</h2>
+        <p><b>Version:</b> 1.0</p>
+        <p><b>Date:</b> 05-09-2024</p>
+        <p><b>Author:</b> Gianpaolo Albanese</p>
+        <p><b>E-Mail:</b> albaneg@yahoo.com</p>
+        <p><b>Work Email:</b> gianpaoa@amazon.com</p>
+        <p><b>Assisted by:</b> Amazon Q for VS Code</p>
+        <p>A tool for transcribing meeting audio and generating detailed meeting notes using AWS services.</p>
+        """
+        
+        QMessageBox.about(self, "About Meeting Transcriber", about_text)
     
     def start_transcription(self):
         """Start the transcription process"""

@@ -13,6 +13,13 @@ Features:
 - Action items with owners and deadlines
 - Decisions made during the meeting
 - Fallback to simple summarization if AWS Bedrock is unavailable
+
+Author: Gianpaolo Albanese
+E-Mail: albaneg@yahoo.com
+Work Email: gianpaoa@amazon.com
+Date: 05-09-2024
+Version: 1.0
+Assisted by: Amazon Q for VS Code
 """
 
 import os
