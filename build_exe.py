@@ -38,6 +38,15 @@ def build_exe():
         print("Installing PyQt5...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", "PyQt5"])
     
+    # Install additional dependencies for desktop shortcut creation
+    try:
+        import winshell
+        import win32com
+    except ImportError:
+        print("Installing winshell and pywin32 for desktop shortcut creation...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "winshell"])
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "pywin32"])
+    
     # Create a custom icon with GPA initials and Meeting Transcriber V1 text
     try:
         from PIL import Image, ImageDraw, ImageFont
@@ -135,14 +144,14 @@ def build_exe():
 block_cipher = None
 
 a = Analysis(
-    ['meeting_transcriber_gui.py'],
+    ['splash_entry.py'],  # Use the splash entry point
     pathex=[],
     binaries=[],
-    datas=[],
-    hiddenimports=['boto3', 'botocore'],
+    datas=[('icon.ico', '.')],  # Include icon file in the bundle
+    hiddenimports=['boto3', 'botocore', 'winshell', 'win32com', 'meeting_transcriber_gui'],
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=['splash_hook.py'],  # Add splash hook
     excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
@@ -153,7 +162,7 @@ a = Analysis(
 # Add all Python files in the current directory
 import os
 for file in os.listdir('.'):
-    if file.endswith('.py') and file != 'meeting_transcriber_gui.py' and file != 'build_exe.py':
+    if file.endswith('.py') and file != 'splash_entry.py' and file != 'build_exe.py':
         a.datas += [(file, file, 'DATA')]
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
@@ -198,6 +207,38 @@ exe = EXE(
     
     print("Build complete!")
     print(f"Executable is located at: {os.path.abspath(os.path.join('dist', 'MeetingTranscriber.exe'))}")
+    
+    # Create a desktop shortcut
+    try:
+        if sys.platform == 'win32':
+            print("Creating desktop shortcut...")
+            import winshell
+            from win32com.client import Dispatch
+            
+            # Get the path to the executable
+            exe_path = os.path.abspath(os.path.join('dist', 'MeetingTranscriber.exe'))
+            
+            # Get the desktop path
+            desktop = winshell.desktop()
+            
+            # Create shortcut path
+            shortcut_path = os.path.join(desktop, "Meeting Transcriber.lnk")
+            
+            # Create the shortcut
+            shell = Dispatch('WScript.Shell')
+            shortcut = shell.CreateShortCut(shortcut_path)
+            shortcut.Targetpath = exe_path
+            shortcut.WorkingDirectory = os.path.dirname(exe_path)
+            
+            # Set icon path
+            icon_path = os.path.abspath("icon.ico")
+            if os.path.exists(icon_path):
+                shortcut.IconLocation = icon_path
+                
+            shortcut.save()
+            print(f"Desktop shortcut created at: {shortcut_path}")
+    except Exception as e:
+        print(f"Failed to create desktop shortcut: {e}")
 
 if __name__ == "__main__":
     build_exe()

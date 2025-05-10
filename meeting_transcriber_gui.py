@@ -21,8 +21,15 @@ from pathlib import Path
 from datetime import datetime
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                             QLabel, QLineEdit, QPushButton, QFileDialog, QComboBox,
-                            QGroupBox, QFormLayout, QMessageBox, QTextEdit, QProgressBar)
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
+                            QGroupBox, QFormLayout, QMessageBox, QTextEdit, QProgressBar,
+                            QSplashScreen)
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
+from PyQt5.QtGui import QIcon, QPixmap
+
+# Import the transcription and summarization modules directly
+import aws_transcribe
+from summarizer_bedrock import generate_notes_with_bedrock
+import format_meeting_notes
 
 # Setup logging
 logging.basicConfig(
@@ -45,82 +52,122 @@ class TranscriptionWorker(QThread):
         
     def run(self):
         try:
-            # Create a temporary .env file with the credentials
-            env_file = self._create_temp_env_file()
+            # Set environment variables for AWS credentials - strip any whitespace
+            os.environ["AWS_ACCESS_KEY_ID"] = self.aws_credentials["access_key"].strip()
+            os.environ["AWS_SECRET_ACCESS_KEY"] = self.aws_credentials["secret_key"].strip()
+            os.environ["AWS_REGION"] = self.aws_credentials["region"].strip()
+            os.environ["AWS_S3_BUCKET"] = self.aws_credentials["s3_bucket"].strip()
+            os.environ["BEDROCK_MODEL_ID"] = self.aws_settings["model_id"]
+            os.environ["MODEL_TEMPERATURE"] = self.aws_settings["temperature"]
+            os.environ["MAX_TOKENS"] = self.aws_settings["max_tokens"]
+            os.environ["SYSTEM_PROMPT"] = self.aws_settings["system_prompt"]
+            os.environ["TRANSCRIBE_LANGUAGE_CODE"] = self.aws_settings["language_code"]
+            os.environ["ENABLE_SPEAKER_DIARIZATION"] = "true" if self.aws_settings["enable_diarization"] else "false"
+            os.environ["MAX_SPEAKER_LABELS"] = self.aws_settings["max_speakers"]
             
-            # Run the main.py script as a subprocess
-            cmd = [
-                sys.executable, 
-                os.path.join(os.path.dirname(os.path.abspath(__file__)), "main.py"),
-                "--audio", self.audio_file,
-                "--output", self.output_dir
-            ]
+            # Create output directory if it doesn't exist
+            os.makedirs(self.output_dir, exist_ok=True)
             
-            # Set environment variables for the subprocess
-            env = os.environ.copy()
-            env.update({
-                "AWS_ACCESS_KEY_ID": self.aws_credentials["access_key"],
-                "AWS_SECRET_ACCESS_KEY": self.aws_credentials["secret_key"],
-                "AWS_REGION": self.aws_credentials["region"],
-                "AWS_S3_BUCKET": self.aws_credentials["s3_bucket"],
-                "BEDROCK_MODEL_ID": self.aws_settings["model_id"],
-                "MODEL_TEMPERATURE": self.aws_settings["temperature"],
-                "MAX_TOKENS": self.aws_settings["max_tokens"],
-                "SYSTEM_PROMPT": self.aws_settings["system_prompt"],
-                "TRANSCRIBE_LANGUAGE_CODE": self.aws_settings["language_code"],
-                "ENABLE_SPEAKER_DIARIZATION": "true" if self.aws_settings["enable_diarization"] else "false",
-                "MAX_SPEAKER_LABELS": self.aws_settings["max_speakers"]
-            })
+            # Get base filename without extension
+            base_filename = os.path.splitext(os.path.basename(self.audio_file))[0]
             
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                env=env
+            # Get the file creation/modification date to use as meeting date
+            try:
+                # Get file creation/modification time (creation time on Windows, modification time on Unix)
+                if os.path.exists(self.audio_file):
+                    if sys.platform == 'win32':
+                        file_time = os.path.getctime(self.audio_file)
+                    else:
+                        file_time = os.path.getmtime(self.audio_file)
+                    meeting_date = datetime.fromtimestamp(file_time)
+                    self.progress_update.emit(f"Using audio file date as meeting date: {meeting_date.strftime('%B %d, %Y')}")
+                else:
+                    meeting_date = datetime.now()
+                    self.progress_update.emit(f"Audio file not found, using current date: {meeting_date.strftime('%B %d, %Y')}")
+            except Exception as e:
+                meeting_date = datetime.now()
+                self.progress_update.emit(f"Warning: Could not get file date, using current date: {e}")
+            
+            # Step 1: Transcribe audio
+            self.progress_update.emit("Transcribing audio file... (this may take a while)")
+            transcript = aws_transcribe.transcribe_with_aws(self.audio_file)
+            
+            # Save transcript to file
+            if isinstance(transcript, dict) and 'speaker_segments' in transcript:
+                # Handle speaker diarization format
+                transcript_file = os.path.join(self.output_dir, f"{base_filename}_transcript.txt")
+                speaker_transcript_file = os.path.join(self.output_dir, f"{base_filename}_transcript_with_speakers.txt")
+                
+                # Save plain transcript
+                self.save_to_file(transcript['full_transcript'], transcript_file)
+                
+                # Save transcript with speaker labels
+                speaker_text = ""
+                for segment in transcript['speaker_segments']:
+                    speaker_text += f"{segment['speaker']}: {segment['text']}\n\n"
+                self.save_to_file(speaker_text, speaker_transcript_file)
+                
+                self.progress_update.emit(f"Transcript saved to {transcript_file}")
+                self.progress_update.emit(f"Transcript with speakers saved to {speaker_transcript_file}")
+                
+                # Use the full transcript for summarization
+                text_for_summary = transcript['full_transcript']
+            else:
+                # Handle plain text transcript
+                transcript_file = os.path.join(self.output_dir, f"{base_filename}_transcript.txt")
+                self.save_to_file(transcript, transcript_file)
+                self.progress_update.emit(f"Transcript saved to {transcript_file}")
+                text_for_summary = transcript
+            
+            # Step 2: Generate meeting notes with AWS Bedrock
+            self.progress_update.emit("Generating meeting notes with AWS Bedrock... (this may take a while)")
+            self.progress_update.emit(f"Using model: {os.environ.get('BEDROCK_MODEL_ID', 'anthropic.claude-v2')}")
+            
+            # Use AWS Bedrock for advanced summarization
+            summary, key_points, action_items = generate_notes_with_bedrock(text_for_summary)
+            
+            # Extract participants if available
+            participants = []
+            if isinstance(transcript, dict) and 'speaker_segments' in transcript:
+                # Extract unique speakers
+                speakers = set()
+                for segment in transcript['speaker_segments']:
+                    speakers.add(segment['speaker'])
+                
+                # Add to participants list
+                for speaker in speakers:
+                    participants.append({
+                        'id': speaker,
+                        'name': f"Speaker {speaker.split('_')[-1]}" if speaker.startswith('spk_') else speaker
+                    })
+            
+            # Format meeting notes with enhanced formatting
+            meeting_notes = format_meeting_notes.format_enhanced_meeting_notes(
+                transcript=text_for_summary,
+                summary=summary,
+                key_points=key_points,
+                action_items=action_items,
+                participants=participants,
+                has_speaker_segments=isinstance(transcript, dict) and 'speaker_segments' in transcript,
+                meeting_date=meeting_date  # Use the file date instead of current date
             )
             
-            # Stream the output
-            for line in iter(process.stdout.readline, ''):
-                if line:
-                    self.progress_update.emit(line.strip())
+            # Save meeting notes to file
+            notes_file = os.path.join(self.output_dir, f"{base_filename}_meeting_notes.md")
+            self.save_to_file(meeting_notes, notes_file)
+            self.progress_update.emit(f"Meeting notes saved to {notes_file}")
             
-            process.stdout.close()
-            return_code = process.wait()
-            
-            if return_code == 0:
-                self.finished_signal.emit(True, "Transcription and summarization completed successfully!")
-            else:
-                self.finished_signal.emit(False, f"Process failed with return code {return_code}")
+            self.finished_signal.emit(True, "Transcription and summarization completed successfully!")
                 
         except Exception as e:
             logger.error(f"Error in transcription worker: {e}")
+            self.progress_update.emit(f"Error: {str(e)}")
             self.finished_signal.emit(False, f"Error: {str(e)}")
     
-    def _create_temp_env_file(self):
-        """Create a temporary .env file with the credentials"""
-        temp_env = tempfile.NamedTemporaryFile(delete=False, mode='w')
-        temp_env.write(f"# AWS Credentials\n")
-        temp_env.write(f"AWS_ACCESS_KEY_ID={self.aws_credentials['access_key']}\n")
-        temp_env.write(f"AWS_SECRET_ACCESS_KEY={self.aws_credentials['secret_key']}\n")
-        temp_env.write(f"AWS_REGION={self.aws_credentials['region']}\n")
-        temp_env.write(f"AWS_S3_BUCKET={self.aws_credentials['s3_bucket']}\n\n")
-        
-        temp_env.write(f"# AWS Bedrock Settings\n")
-        temp_env.write(f"BEDROCK_MODEL_ID={self.aws_settings['model_id']}\n\n")
-        
-        temp_env.write(f"# AI Model Settings\n")
-        temp_env.write(f"MODEL_TEMPERATURE={self.aws_settings['temperature']}\n")
-        temp_env.write(f"MAX_TOKENS={self.aws_settings['max_tokens']}\n")
-        temp_env.write(f"SYSTEM_PROMPT=\"{self.aws_settings['system_prompt']}\"\n\n")
-        
-        temp_env.write(f"# Transcription Settings\n")
-        temp_env.write(f"TRANSCRIBE_LANGUAGE_CODE={self.aws_settings['language_code']}\n")
-        temp_env.write(f"ENABLE_SPEAKER_DIARIZATION={'true' if self.aws_settings['enable_diarization'] else 'false'}\n")
-        temp_env.write(f"MAX_SPEAKER_LABELS={self.aws_settings['max_speakers']}\n")
-        
-        temp_env.close()
-        return temp_env.name
+    def save_to_file(self, content, file_path):
+        """Save content to a file."""
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(content)
 
 class MeetingTranscriberGUI(QMainWindow):
     def __init__(self):
@@ -131,6 +178,11 @@ class MeetingTranscriberGUI(QMainWindow):
     def initUI(self):
         self.setWindowTitle('Meeting Transcriber')
         self.setGeometry(100, 100, 800, 600)
+        
+        # Set application icon
+        icon_path = self.get_icon_path()
+        if icon_path:
+            self.setWindowIcon(QIcon(icon_path))
         
         # Main widget and layout
         main_widget = QWidget()
@@ -257,6 +309,23 @@ class MeetingTranscriberGUI(QMainWindow):
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
     
+    def get_icon_path(self):
+        """Get the path to the application icon"""
+        # Check for icon in the current directory
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.ico")
+        if os.path.exists(icon_path):
+            return icon_path
+            
+        # If running as a PyInstaller bundle
+        if getattr(sys, 'frozen', False):
+            # PyInstaller creates a temp folder and stores path in _MEIPASS
+            base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+            icon_path = os.path.join(base_path, "icon.ico")
+            if os.path.exists(icon_path):
+                return icon_path
+        
+        return None
+    
     def browse_audio_file(self):
         file_path, _ = QFileDialog.getOpenFileName(
             self, "Select Audio File", "", 
@@ -270,9 +339,28 @@ class MeetingTranscriberGUI(QMainWindow):
         if dir_path:
             self.output_dir_input.setText(dir_path)
     
+    def get_config_path(self):
+        """Get the path to the config file, handling both script and executable modes"""
+        if getattr(sys, 'frozen', False):
+            # Running as executable
+            # Use the user's AppData directory for Windows
+            if sys.platform == 'win32':
+                app_data = os.environ.get('APPDATA', '')
+                if app_data:
+                    config_dir = os.path.join(app_data, 'MeetingTranscriber')
+                    os.makedirs(config_dir, exist_ok=True)
+                    return os.path.join(config_dir, "gui_config.json")
+            
+            # Fallback to executable directory
+            return os.path.join(os.path.dirname(sys.executable), "gui_config.json")
+        else:
+            # Running as script
+            return os.path.join(os.path.dirname(os.path.abspath(__file__)), "gui_config.json")
+    
     def load_settings(self):
         """Load settings from config file if it exists"""
-        config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gui_config.json")
+        config_path = self.get_config_path()
+        logger.info(f"Loading settings from: {config_path}")
         
         if os.path.exists(config_path):
             try:
@@ -299,9 +387,11 @@ class MeetingTranscriberGUI(QMainWindow):
                 # Load file paths
                 self.output_dir_input.setText(config.get("output_dir", ""))
                 
+                logger.info("Settings loaded successfully")
             except Exception as e:
                 logger.error(f"Error loading settings: {e}")
         else:
+            logger.info(f"Config file not found at {config_path}, using defaults")
             # Set default system prompt
             self.system_prompt_input.setText("You are an AI assistant that creates detailed meeting notes from transcripts.")
             
@@ -359,13 +449,19 @@ class MeetingTranscriberGUI(QMainWindow):
             "output_dir": self.output_dir_input.text()
         }
         
-        config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gui_config.json")
+        config_path = self.get_config_path()
+        logger.info(f"Saving settings to: {config_path}")
         
         try:
+            # Ensure the directory exists
+            os.makedirs(os.path.dirname(config_path), exist_ok=True)
+            
             with open(config_path, 'w') as f:
                 json.dump(config, f, indent=4)
-            QMessageBox.information(self, "Settings Saved", "Settings have been saved successfully!")
+            logger.info("Settings saved successfully")
+            QMessageBox.information(self, "Settings Saved", f"Settings have been saved successfully to {config_path}")
         except Exception as e:
+            logger.error(f"Failed to save settings: {e}")
             QMessageBox.critical(self, "Error", f"Failed to save settings: {str(e)}")
     
     def show_about(self):
@@ -462,8 +558,75 @@ class MeetingTranscriberGUI(QMainWindow):
         else:
             QMessageBox.critical(self, "Error", message)
 
+def create_desktop_shortcut():
+    """Create a desktop shortcut for the application with the custom icon"""
+    try:
+        # Only for Windows
+        if sys.platform != 'win32':
+            return
+            
+        import winshell
+        from win32com.client import Dispatch
+        
+        # Get the path to the executable
+        if getattr(sys, 'frozen', False):
+            # Running as executable
+            exe_path = sys.executable
+        else:
+            # Running as script
+            exe_path = os.path.abspath(sys.argv[0])
+        
+        # Get the desktop path
+        desktop = winshell.desktop()
+        
+        # Create shortcut path
+        shortcut_path = os.path.join(desktop, "Meeting Transcriber.lnk")
+        
+        # Create the shortcut
+        shell = Dispatch('WScript.Shell')
+        shortcut = shell.CreateShortCut(shortcut_path)
+        shortcut.Targetpath = exe_path
+        shortcut.WorkingDirectory = os.path.dirname(exe_path)
+        
+        # Set icon path
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.ico")
+        if os.path.exists(icon_path):
+            shortcut.IconLocation = icon_path
+            
+        shortcut.save()
+        logger.info(f"Desktop shortcut created at: {shortcut_path}")
+    except Exception as e:
+        logger.error(f"Failed to create desktop shortcut: {e}")
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    
+    # Set application icon for taskbar
+    icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.ico")
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
+    
+    # Create desktop shortcut if running as executable
+    if getattr(sys, 'frozen', False):
+        try:
+            create_desktop_shortcut()
+        except Exception as e:
+            logger.error(f"Error creating desktop shortcut: {e}")
+    
+    # Show splash screen
+    try:
+        from splash_screen import show_splash
+        splash = show_splash(app, 3000)  # Show for 3 seconds
+    except Exception as e:
+        logger.error(f"Error showing splash screen: {e}")
+        splash = None
+    
+    # Create and show the main window
     window = MeetingTranscriberGUI()
     window.show()
+    
+    # If splash screen is shown, make sure it stays on top until closed
+    if splash and splash.isVisible():
+        splash.finish(window)
+    
     sys.exit(app.exec_())

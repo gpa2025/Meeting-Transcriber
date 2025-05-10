@@ -4,6 +4,13 @@ AWS Transcribe direct implementation without speech_recognition dependency.
 This module provides a direct implementation of AWS Transcribe functionality
 without relying on the speech_recognition package, which has dependencies
 that may not be available in newer Python versions.
+
+Author: Gianpaolo Albanese
+E-Mail: albaneg@yahoo.com
+Work Email: gianpaoa@amazon.com
+Date: 05-09-2024
+Version: 1.0
+Assisted by: Amazon Q for VS Code
 """
 
 import os
@@ -29,17 +36,33 @@ def transcribe_with_aws(audio_file_path):
     logger.info("Using AWS Transcribe service")
     
     # Check if AWS credentials are configured
-    if not (os.environ.get('AWS_ACCESS_KEY_ID') and os.environ.get('AWS_SECRET_ACCESS_KEY')):
+    aws_access_key = os.environ.get('AWS_ACCESS_KEY_ID', '').strip()
+    aws_secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY', '').strip()
+    aws_region = os.environ.get('AWS_REGION', 'us-east-1').strip()
+    
+    if not (aws_access_key and aws_secret_key):
         raise EnvironmentError("AWS credentials not found. Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.")
     
-    # Create a client for the AWS Transcribe service
-    transcribe = boto3.client('transcribe',
-                             region_name=os.environ.get('AWS_REGION', 'us-east-1'))
+    # Create a client for the AWS Transcribe service with explicit credentials
+    transcribe = boto3.client(
+        service_name='transcribe',
+        region_name=aws_region,
+        aws_access_key_id=aws_access_key,
+        aws_secret_access_key=aws_secret_key
+    )
     
     # Upload file to S3 (required for AWS Transcribe)
-    s3 = boto3.client('s3',
-                     region_name=os.environ.get('AWS_REGION', 'us-east-1'))
-    bucket_name = os.environ.get('AWS_S3_BUCKET', 'meeting-transcriber-bucket')
+    s3 = boto3.client(
+        service_name='s3',
+        region_name=aws_region,
+        aws_access_key_id=aws_access_key,
+        aws_secret_access_key=aws_secret_key
+    )
+    
+    bucket_name = os.environ.get('AWS_S3_BUCKET', '').strip()
+    if not bucket_name:
+        raise ValueError("AWS S3 bucket name not specified. Set AWS_S3_BUCKET environment variable.")
+    
     file_name = os.path.basename(audio_file_path)
     s3_path = f"uploads/{file_name}"
     

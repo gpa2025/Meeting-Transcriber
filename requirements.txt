@@ -3,3 +3,7 @@ PyQt5>=5.15.0
 python-dotenv>=1.0.0
 requests>=2.31.0
 tqdm>=4.66.0
+pyinstaller>=5.0.0
+pillow>=9.0.0
+winshell>=0.6.0
+pywin32>=300
