@@ -46,7 +46,7 @@ output/*
 Thumbs.db
 
 # PyInstaller
-dist/
+# dist/  # Commented out to include dist folder in repository
 build/
 *.spec
 
