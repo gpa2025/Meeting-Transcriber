@@ -12,6 +12,7 @@ $outputDir = Join-Path $rootPath "dist"
 $installerDir = Join-Path $outputDir "MeetingTranscriberInstaller"
 $installerZip = Join-Path $outputDir "MeetingTranscriberInstaller.zip"
 $installerScript = Join-Path $installerDir "Install.bat"
+$launchScript = Join-Path $installerDir "LaunchApp.bat"
 
 # Check if the MSIX package exists
 if (-not (Test-Path $msixPath)) {
@@ -59,7 +60,7 @@ Copy-Item $msixPath -Destination $installerDir
 Copy-Item $certPublicPath -Destination $installerDir
 Write-Host "Copied MSIX package and certificate to installer directory" -ForegroundColor Green
 
-# Create installation script with improved error handling
+# Create installation script with improved error handling and desktop shortcut creation
 $installBatchContent = @"
 @echo off
 echo ===================================================
@@ -69,6 +70,7 @@ echo.
 echo This script will:
 echo 1. Install the certificate to your trusted root store
 echo 2. Install the Meeting Transcriber application
+echo 3. Create a desktop shortcut for easy access
 echo.
 echo Please allow administrative access when prompted.
 echo.
@@ -108,15 +110,36 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 
+REM Create desktop shortcut
+echo Creating desktop shortcut...
+powershell -Command "$WshShell = New-Object -ComObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut([System.Environment]::GetFolderPath('Desktop') + '\Meeting Transcriber.lnk'); $Shortcut.TargetPath = '%SystemRoot%\explorer.exe'; $Shortcut.Arguments = 'shell:AppsFolder\GPA.MeetingTranscriber_1.0.0.0_x64__1234567890abc'; $Shortcut.IconLocation = '%SystemRoot%\System32\SHELL32.dll,77'; $Shortcut.Save()"
+
+REM Create Start Menu shortcut (alternative method)
+echo Creating Start Menu shortcut...
+powershell -Command "$appData = [Environment]::GetFolderPath('ApplicationData'); $startMenu = Join-Path $appData 'Microsoft\Windows\Start Menu\Programs'; $shortcutPath = Join-Path $startMenu 'Meeting Transcriber.lnk'; $WshShell = New-Object -ComObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut($shortcutPath); $Shortcut.TargetPath = '%SystemRoot%\explorer.exe'; $Shortcut.Arguments = 'shell:AppsFolder\GPA.MeetingTranscriber_1.0.0.0_x64__1234567890abc'; $Shortcut.IconLocation = '%SystemRoot%\System32\SHELL32.dll,77'; $Shortcut.Save()"
+
 echo.
 echo Installation complete!
-echo You can now find Meeting Transcriber in your Start menu.
+echo You can now find Meeting Transcriber:
+echo 1. On your desktop (shortcut created)
+echo 2. In the Start menu (shortcut created)
+echo 3. By using the LaunchApp.bat file included in this folder
 echo.
 pause
 "@
 
 Set-Content -Path $installerScript -Value $installBatchContent
-Write-Host "Created installation script with improved error handling" -ForegroundColor Green
+Write-Host "Created installation script with improved error handling and shortcuts" -ForegroundColor Green
+
+# Create a direct launch script
+$launchBatchContent = @"
+@echo off
+echo Launching Meeting Transcriber...
+explorer.exe shell:AppsFolder\GPA.MeetingTranscriber_1.0.0.0_x64__1234567890abc
+"@
+
+Set-Content -Path $launchScript -Value $launchBatchContent
+Write-Host "Created direct launch script" -ForegroundColor Green
 
 # Create a README file with detailed instructions
 $readmeContent = @"
@@ -130,6 +153,20 @@ $readmeContent = @"
 4. The installer will:
    - Install the certificate to your trusted root store
    - Install the Meeting Transcriber application
+   - Create shortcuts for easy access
+
+## Launching the Application
+
+After installation, you can launch Meeting Transcriber in several ways:
+
+1. From the desktop shortcut
+2. From the Start menu (search for "Meeting Transcriber")
+3. Using the included LaunchApp.bat file
+
+If you cannot find the application in the Start menu:
+- Use the desktop shortcut or LaunchApp.bat file
+- Try restarting your computer to refresh the Start menu
+- Search specifically for "Meeting" or "Transcriber"
 
 ## Troubleshooting
 
@@ -142,6 +179,7 @@ If you encounter installation issues:
 3. If you see a signature validation error, the installer will automatically
    try to use the -AllowUntrusted flag to bypass this check
 4. Check Windows Event Viewer for more detailed error messages
+5. Try restarting your computer after installation
 
 ## System Requirements
 
@@ -151,10 +189,11 @@ If you encounter installation issues:
 ## Support
 
 For support, please contact: albaneg@yahoo.com
+GitHub: gpa2025
 "@
 
 Set-Content -Path (Join-Path $installerDir "README.txt") -Value $readmeContent
-Write-Host "Created README file with troubleshooting instructions" -ForegroundColor Green
+Write-Host "Created README file with detailed instructions" -ForegroundColor Green
 
 # Create ZIP archive
 if (Test-Path $installerZip) {
@@ -171,5 +210,8 @@ Write-Host "1. Extract all files from $installerZip to a folder" -ForegroundColo
 Write-Host "2. Right-click on Install.bat and select 'Run as administrator'" -ForegroundColor White
 Write-Host "3. Follow the on-screen instructions" -ForegroundColor White
 Write-Host ""
-Write-Host "The installer now includes improved error handling and will automatically" -ForegroundColor Yellow
-Write-Host "try alternative installation methods if the standard method fails." -ForegroundColor Yellow
+Write-Host "The installer now includes:" -ForegroundColor Yellow
+Write-Host "- Improved error handling" -ForegroundColor White
+Write-Host "- Desktop shortcut creation" -ForegroundColor White
+Write-Host "- Start menu shortcut creation" -ForegroundColor White
+Write-Host "- Direct launch script (LaunchApp.bat)" -ForegroundColor White
