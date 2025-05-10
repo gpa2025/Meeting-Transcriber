@@ -59,7 +59,7 @@ Copy-Item $msixPath -Destination $installerDir
 Copy-Item $certPublicPath -Destination $installerDir
 Write-Host "Copied MSIX package and certificate to installer directory" -ForegroundColor Green
 
-# Create installation script
+# Create installation script with improved error handling
 $installBatchContent = @"
 @echo off
 echo ===================================================
@@ -77,14 +77,38 @@ pause
 REM Install certificate to trusted root store (requires admin)
 echo Installing certificate...
 powershell -Command "Start-Process certutil -ArgumentList '-addstore', 'ROOT', 'MeetingTranscriberCert.cer' -Verb RunAs -Wait"
-echo Certificate installed.
+if %ERRORLEVEL% NEQ 0 (
+    echo Error: Failed to install certificate.
+    echo Please try running this script as administrator.
+    pause
+    exit /b 1
+)
+echo Certificate installed successfully.
 echo.
 
-REM Install MSIX package
+REM Wait a moment for certificate to be fully registered
+echo Waiting for certificate to register...
+timeout /t 3 > nul
+echo.
+
+REM Install MSIX package with multiple fallback methods
 echo Installing Meeting Transcriber...
-powershell -Command "Add-AppxPackage -Path 'MeetingTranscriber.msix'"
-echo.
+powershell -Command "$ErrorActionPreference = 'Stop'; try { Add-AppxPackage -Path 'MeetingTranscriber.msix'; Write-Host 'Standard installation successful.' -ForegroundColor Green; } catch { Write-Host 'Standard installation failed, trying with -AllowUntrusted flag...' -ForegroundColor Yellow; try { Add-AppxPackage -Path 'MeetingTranscriber.msix' -AllowUntrusted; Write-Host 'Installation with -AllowUntrusted successful.' -ForegroundColor Green; } catch { Write-Host 'Installation failed with error:' -ForegroundColor Red; Write-Host $_.Exception.Message -ForegroundColor Red; exit 1; } }"
 
+if %ERRORLEVEL% NEQ 0 (
+    echo.
+    echo Error: Failed to install the application.
+    echo.
+    echo Troubleshooting steps:
+    echo 1. Make sure you're running this script as administrator
+    echo 2. Try enabling Developer Mode in Windows Settings
+    echo 3. Check Windows Event Viewer for more details
+    echo.
+    pause
+    exit /b 1
+)
+
+echo.
 echo Installation complete!
 echo You can now find Meeting Transcriber in your Start menu.
 echo.
@@ -92,21 +116,32 @@ pause
 "@
 
 Set-Content -Path $installerScript -Value $installBatchContent
-Write-Host "Created installation script" -ForegroundColor Green
+Write-Host "Created installation script with improved error handling" -ForegroundColor Green
 
-# Create a README file
+# Create a README file with detailed instructions
 $readmeContent = @"
 # Meeting Transcriber Installer
 
 ## Installation Instructions
 
 1. Extract all files from this ZIP archive to a folder
-2. Run the Install.bat file
-3. Allow administrative access when prompted
+2. Right-click on Install.bat and select "Run as administrator"
+3. Follow the on-screen instructions
 4. The installer will:
    - Install the certificate to your trusted root store
    - Install the Meeting Transcriber application
-5. After installation, you can find Meeting Transcriber in your Start menu
+
+## Troubleshooting
+
+If you encounter installation issues:
+
+1. Make sure you're running Install.bat as administrator
+2. Try enabling Developer Mode:
+   - Go to Settings > Update & Security > For developers
+   - Turn on "Developer Mode"
+3. If you see a signature validation error, the installer will automatically
+   try to use the -AllowUntrusted flag to bypass this check
+4. Check Windows Event Viewer for more detailed error messages
 
 ## System Requirements
 
@@ -119,7 +154,7 @@ For support, please contact: albaneg@yahoo.com
 "@
 
 Set-Content -Path (Join-Path $installerDir "README.txt") -Value $readmeContent
-Write-Host "Created README file" -ForegroundColor Green
+Write-Host "Created README file with troubleshooting instructions" -ForegroundColor Green
 
 # Create ZIP archive
 if (Test-Path $installerZip) {
@@ -133,8 +168,8 @@ Write-Host "Created installer bundle at $installerZip" -ForegroundColor Green
 Write-Host ""
 Write-Host "Installation Instructions:" -ForegroundColor Cyan
 Write-Host "1. Extract all files from $installerZip to a folder" -ForegroundColor White
-Write-Host "2. Run the Install.bat file" -ForegroundColor White
-Write-Host "3. Allow administrative access when prompted" -ForegroundColor White
-Write-Host "4. The installer will install the certificate and the application" -ForegroundColor White
+Write-Host "2. Right-click on Install.bat and select 'Run as administrator'" -ForegroundColor White
+Write-Host "3. Follow the on-screen instructions" -ForegroundColor White
 Write-Host ""
-Write-Host "This installer bundle can be distributed to other users." -ForegroundColor Yellow
+Write-Host "The installer now includes improved error handling and will automatically" -ForegroundColor Yellow
+Write-Host "try alternative installation methods if the standard method fails." -ForegroundColor Yellow
