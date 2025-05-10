@@ -125,11 +125,10 @@ Write-Host "Cleaned up temporary directory" -ForegroundColor Green
 # Final instructions
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Cyan
-Write-Host "1. Install the MSIX package by double-clicking $outputPath" -ForegroundColor White
-Write-Host "2. If you see a security warning, click 'Install anyway'" -ForegroundColor White
+Write-Host "1. Sign the package using sign_msix_package.ps1" -ForegroundColor White
+Write-Host "2. Install the certificate and then install the MSIX package" -ForegroundColor White
 Write-Host "3. The application will be installed and available in the Start menu" -ForegroundColor White
 Write-Host ""
-Write-Host "Note: To distribute this package to other users, they may need to install the" -ForegroundColor Yellow
-Write-Host "certificate used to sign the package. For proper distribution, consider" -ForegroundColor Yellow
-Write-Host "signing the package with a trusted certificate." -ForegroundColor Yellow
+Write-Host "To sign the package, run:" -ForegroundColor Yellow
+Write-Host "    .\sign_msix_package.ps1" -ForegroundColor Yellow
 
