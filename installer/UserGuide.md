@@ -14,10 +14,12 @@ Meeting Transcriber is a powerful tool that uses AWS services to transcribe audi
 
 ## Installation
 
-1. **Run the installer**: Double-click on `MeetingTranscriberSetup.exe`
-2. **Follow the wizard**: Accept the license agreement and choose installation options
-3. **Complete installation**: Click "Finish" to complete the installation
-4. **Launch the application**: Use the desktop shortcut or start menu entry
+1. **Install the package**: Double-click on `MeetingTranscriber.msix`
+2. **If prompted**: Click "Install" when the security prompt appears
+   - You may see a message about the publisher not being trusted
+   - Click "Install anyway" if you trust the source
+3. **Complete installation**: Wait for the installation to complete
+4. **Launch the application**: Use the Start menu or desktop shortcut
 
 ## Setting Up AWS
 
