@@ -13,6 +13,7 @@ $installerDir = Join-Path $outputDir "MeetingTranscriberInstaller"
 $installerZip = Join-Path $outputDir "MeetingTranscriberInstaller.zip"
 $installerScript = Join-Path $installerDir "Install.bat"
 $launchScript = Join-Path $installerDir "LaunchApp.bat"
+$directInstallScript = Join-Path $installerDir "DirectInstall.ps1"
 
 # Check if the MSIX package exists
 if (-not (Test-Path $msixPath)) {
@@ -60,76 +61,166 @@ Copy-Item $msixPath -Destination $installerDir
 Copy-Item $certPublicPath -Destination $installerDir
 Write-Host "Copied MSIX package and certificate to installer directory" -ForegroundColor Green
 
-# Create installation script with improved error handling and desktop shortcut creation
+# Create a PowerShell installation script (more reliable)
+$directInstallScriptContent = @"
+# PowerShell script to install Meeting Transcriber
+# This script must be run as administrator
+
+# Check if running as administrator
+if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+    Write-Host "This script must be run as Administrator. Please restart with elevated privileges." -ForegroundColor Red
+    Write-Host "Right-click on the script and select 'Run as Administrator'." -ForegroundColor Red
+    Read-Host "Press Enter to exit"
+    exit
+}
+
+Write-Host "====================================================" -ForegroundColor Cyan
+Write-Host "Meeting Transcriber Installer" -ForegroundColor Cyan
+Write-Host "====================================================" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "This script will:" -ForegroundColor White
+Write-Host "1. Install the certificate to your trusted root store" -ForegroundColor White
+Write-Host "2. Install the Meeting Transcriber application" -ForegroundColor White
+Write-Host "3. Create shortcuts for easy access" -ForegroundColor White
+Write-Host ""
+
+# Get the current directory
+$currentDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$certPath = Join-Path $currentDir "MeetingTranscriberCert.cer"
+$msixPath = Join-Path $currentDir "MeetingTranscriber.msix"
+
+# Check if files exist
+if (-not (Test-Path $certPath)) {
+    Write-Host "Error: Certificate not found at $certPath" -ForegroundColor Red
+    Read-Host "Press Enter to exit"
+    exit
+}
+
+if (-not (Test-Path $msixPath)) {
+    Write-Host "Error: MSIX package not found at $msixPath" -ForegroundColor Red
+    Read-Host "Press Enter to exit"
+    exit
+}
+
+# Install certificate to trusted root store
+Write-Host "Installing certificate..." -ForegroundColor Cyan
+try {
+    Import-Certificate -FilePath $certPath -CertStoreLocation Cert:\LocalMachine\Root | Out-Null
+    Write-Host "Certificate installed successfully." -ForegroundColor Green
+} catch {
+    Write-Host "Error installing certificate: $_" -ForegroundColor Red
+    Write-Host "Trying alternative method..." -ForegroundColor Yellow
+    
+    try {
+        certutil -addstore -f "ROOT" $certPath | Out-Null
+        Write-Host "Certificate installed successfully using certutil." -ForegroundColor Green
+    } catch {
+        Write-Host "Failed to install certificate. Error: $_" -ForegroundColor Red
+        Read-Host "Press Enter to exit"
+        exit
+    }
+}
+
+# Wait a moment for certificate to be fully registered
+Write-Host "Waiting for certificate to register..." -ForegroundColor Cyan
+Start-Sleep -Seconds 3
+
+# Install MSIX package with multiple fallback methods
+Write-Host "Installing Meeting Transcriber..." -ForegroundColor Cyan
+try {
+    Add-AppxPackage -Path $msixPath
+    Write-Host "Standard installation successful." -ForegroundColor Green
+} catch {
+    Write-Host "Standard installation failed, trying with -AllowUntrusted flag..." -ForegroundColor Yellow
+    try {
+        Add-AppxPackage -Path $msixPath -AllowUntrusted
+        Write-Host "Installation with -AllowUntrusted successful." -ForegroundColor Green
+    } catch {
+        Write-Host "Installation failed with error:" -ForegroundColor Red
+        Write-Host $_.Exception.Message -ForegroundColor Red
+        
+        Write-Host "Trying to register the package directly..." -ForegroundColor Yellow
+        try {
+            Add-AppxPackage -Register -Path $msixPath -AllowUntrusted
+            Write-Host "Direct registration successful." -ForegroundColor Green
+        } catch {
+            Write-Host "All installation methods failed. Error: $_" -ForegroundColor Red
+            Read-Host "Press Enter to exit"
+            exit
+        }
+    }
+}
+
+# Create desktop shortcut
+Write-Host "Creating desktop shortcut..." -ForegroundColor Cyan
+try {
+    $WshShell = New-Object -ComObject WScript.Shell
+    $Shortcut = $WshShell.CreateShortcut([System.Environment]::GetFolderPath('Desktop') + '\Meeting Transcriber.lnk')
+    $Shortcut.TargetPath = "$env:SystemRoot\explorer.exe"
+    $Shortcut.Arguments = "shell:AppsFolder\GPA.MeetingTranscriber_1.0.0.0_x64__1234567890abc"
+    $Shortcut.IconLocation = "$env:SystemRoot\System32\SHELL32.dll,77"
+    $Shortcut.Save()
+    Write-Host "Desktop shortcut created successfully." -ForegroundColor Green
+} catch {
+    Write-Host "Failed to create desktop shortcut: $_" -ForegroundColor Yellow
+    Write-Host "You can still launch the app from the Start menu or using LaunchApp.bat" -ForegroundColor Yellow
+}
+
+# Create Start Menu shortcut
+Write-Host "Creating Start Menu shortcut..." -ForegroundColor Cyan
+try {
+    $appData = [Environment]::GetFolderPath('ApplicationData')
+    $startMenu = Join-Path $appData 'Microsoft\Windows\Start Menu\Programs'
+    $shortcutPath = Join-Path $startMenu 'Meeting Transcriber.lnk'
+    $WshShell = New-Object -ComObject WScript.Shell
+    $Shortcut = $WshShell.CreateShortcut($shortcutPath)
+    $Shortcut.TargetPath = "$env:SystemRoot\explorer.exe"
+    $Shortcut.Arguments = "shell:AppsFolder\GPA.MeetingTranscriber_1.0.0.0_x64__1234567890abc"
+    $Shortcut.IconLocation = "$env:SystemRoot\System32\SHELL32.dll,77"
+    $Shortcut.Save()
+    Write-Host "Start Menu shortcut created successfully." -ForegroundColor Green
+} catch {
+    Write-Host "Failed to create Start Menu shortcut: $_" -ForegroundColor Yellow
+}
+
+Write-Host ""
+Write-Host "Installation complete!" -ForegroundColor Green
+Write-Host "You can now find Meeting Transcriber:" -ForegroundColor White
+Write-Host "1. On your desktop (shortcut created)" -ForegroundColor White
+Write-Host "2. In the Start menu (shortcut created)" -ForegroundColor White
+Write-Host "3. By using the LaunchApp.bat file included in this folder" -ForegroundColor White
+Write-Host ""
+Write-Host "If you cannot find the application, try restarting your computer." -ForegroundColor Yellow
+Write-Host ""
+Read-Host "Press Enter to exit"
+"@
+
+Set-Content -Path $directInstallScript -Value $directInstallScriptContent
+Write-Host "Created PowerShell installation script" -ForegroundColor Green
+
+# Create a simple batch file to launch the PowerShell script with admin rights
 $installBatchContent = @"
 @echo off
 echo ===================================================
 echo Meeting Transcriber Installer
 echo ===================================================
 echo.
-echo This script will:
-echo 1. Install the certificate to your trusted root store
-echo 2. Install the Meeting Transcriber application
-echo 3. Create a desktop shortcut for easy access
+echo This script will launch the PowerShell installer with administrator privileges.
 echo.
 echo Please allow administrative access when prompted.
 echo.
 pause
 
-REM Install certificate to trusted root store (requires admin)
-echo Installing certificate...
-powershell -Command "Start-Process certutil -ArgumentList '-addstore', 'ROOT', 'MeetingTranscriberCert.cer' -Verb RunAs -Wait"
-if %ERRORLEVEL% NEQ 0 (
-    echo Error: Failed to install certificate.
-    echo Please try running this script as administrator.
-    pause
-    exit /b 1
-)
-echo Certificate installed successfully.
-echo.
-
-REM Wait a moment for certificate to be fully registered
-echo Waiting for certificate to register...
-timeout /t 3 > nul
-echo.
-
-REM Install MSIX package with multiple fallback methods
-echo Installing Meeting Transcriber...
-powershell -Command "$ErrorActionPreference = 'Stop'; try { Add-AppxPackage -Path 'MeetingTranscriber.msix'; Write-Host 'Standard installation successful.' -ForegroundColor Green; } catch { Write-Host 'Standard installation failed, trying with -AllowUntrusted flag...' -ForegroundColor Yellow; try { Add-AppxPackage -Path 'MeetingTranscriber.msix' -AllowUntrusted; Write-Host 'Installation with -AllowUntrusted successful.' -ForegroundColor Green; } catch { Write-Host 'Installation failed with error:' -ForegroundColor Red; Write-Host $_.Exception.Message -ForegroundColor Red; exit 1; } }"
-
-if %ERRORLEVEL% NEQ 0 (
-    echo.
-    echo Error: Failed to install the application.
-    echo.
-    echo Troubleshooting steps:
-    echo 1. Make sure you're running this script as administrator
-    echo 2. Try enabling Developer Mode in Windows Settings
-    echo 3. Check Windows Event Viewer for more details
-    echo.
-    pause
-    exit /b 1
-)
-
-REM Create desktop shortcut
-echo Creating desktop shortcut...
-powershell -Command "$WshShell = New-Object -ComObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut([System.Environment]::GetFolderPath('Desktop') + '\Meeting Transcriber.lnk'); $Shortcut.TargetPath = '%SystemRoot%\explorer.exe'; $Shortcut.Arguments = 'shell:AppsFolder\GPA.MeetingTranscriber_1.0.0.0_x64__1234567890abc'; $Shortcut.IconLocation = '%SystemRoot%\System32\SHELL32.dll,77'; $Shortcut.Save()"
-
-REM Create Start Menu shortcut (alternative method)
-echo Creating Start Menu shortcut...
-powershell -Command "$appData = [Environment]::GetFolderPath('ApplicationData'); $startMenu = Join-Path $appData 'Microsoft\Windows\Start Menu\Programs'; $shortcutPath = Join-Path $startMenu 'Meeting Transcriber.lnk'; $WshShell = New-Object -ComObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut($shortcutPath); $Shortcut.TargetPath = '%SystemRoot%\explorer.exe'; $Shortcut.Arguments = 'shell:AppsFolder\GPA.MeetingTranscriber_1.0.0.0_x64__1234567890abc'; $Shortcut.IconLocation = '%SystemRoot%\System32\SHELL32.dll,77'; $Shortcut.Save()"
+powershell -ExecutionPolicy Bypass -Command "Start-Process powershell -ArgumentList '-ExecutionPolicy Bypass -File ""DirectInstall.ps1""' -Verb RunAs"
 
 echo.
-echo Installation complete!
-echo You can now find Meeting Transcriber:
-echo 1. On your desktop (shortcut created)
-echo 2. In the Start menu (shortcut created)
-echo 3. By using the LaunchApp.bat file included in this folder
+echo If the installer window doesn't appear, please run DirectInstall.ps1 as administrator manually.
 echo.
 pause
 "@
 
 Set-Content -Path $installerScript -Value $installBatchContent
-Write-Host "Created installation script with improved error handling and shortcuts" -ForegroundColor Green
+Write-Host "Created batch launcher for PowerShell installer" -ForegroundColor Green
 
 # Create a direct launch script
 $launchBatchContent = @"
@@ -155,6 +246,13 @@ $readmeContent = @"
    - Install the Meeting Transcriber application
    - Create shortcuts for easy access
 
+## Alternative Installation Method
+
+If the standard installer doesn't work:
+1. Right-click on DirectInstall.ps1
+2. Select "Run with PowerShell" or "Run as administrator"
+3. Follow the on-screen instructions
+
 ## Launching the Application
 
 After installation, you can launch Meeting Transcriber in several ways:
@@ -172,12 +270,11 @@ If you cannot find the application in the Start menu:
 
 If you encounter installation issues:
 
-1. Make sure you're running Install.bat as administrator
+1. Make sure you're running the installer as administrator
 2. Try enabling Developer Mode:
    - Go to Settings > Update & Security > For developers
    - Turn on "Developer Mode"
-3. If you see a signature validation error, the installer will automatically
-   try to use the -AllowUntrusted flag to bypass this check
+3. Try the alternative installation method (DirectInstall.ps1)
 4. Check Windows Event Viewer for more detailed error messages
 5. Try restarting your computer after installation
 
@@ -189,7 +286,6 @@ If you encounter installation issues:
 ## Support
 
 For support, please contact: albaneg@yahoo.com
-GitHub: gpa2025
 "@
 
 Set-Content -Path (Join-Path $installerDir "README.txt") -Value $readmeContent
@@ -211,7 +307,7 @@ Write-Host "2. Right-click on Install.bat and select 'Run as administrator'" -Fo
 Write-Host "3. Follow the on-screen instructions" -ForegroundColor White
 Write-Host ""
 Write-Host "The installer now includes:" -ForegroundColor Yellow
-Write-Host "- Improved error handling" -ForegroundColor White
-Write-Host "- Desktop shortcut creation" -ForegroundColor White
-Write-Host "- Start menu shortcut creation" -ForegroundColor White
-Write-Host "- Direct launch script (LaunchApp.bat)" -ForegroundColor White
+Write-Host "- A more reliable PowerShell installation script" -ForegroundColor White
+Write-Host "- Multiple installation methods" -ForegroundColor White
+Write-Host "- Better error handling and feedback" -ForegroundColor White
+Write-Host "- Desktop and Start menu shortcuts" -ForegroundColor White
