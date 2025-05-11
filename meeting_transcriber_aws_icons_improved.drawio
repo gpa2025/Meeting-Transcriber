@@ -78,6 +78,31 @@
           <mxGeometry x="330" y="170" width="120" height="70" as="geometry" />
         </mxCell>
         
+        <!-- Module Components -->
+        <!-- Transcription Module -->
+        <mxCell id="transcribe_module" value="" style="outlineConnect=0;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.aws3.android;fillColor=#8C4FFF;gradientColor=none;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="250" y="250" width="30" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="transcribe_module_label" value="Transcription Module" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="235" y="284" width="60" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- Summarization Module -->
+        <mxCell id="summarize_module" value="" style="outlineConnect=0;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.aws3.android;fillColor=#5294CF;gradientColor=none;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="375" y="250" width="30" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="summarize_module_label" value="Summarization Module" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="360" y="284" width="60" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- Formatting Module -->
+        <mxCell id="format_module" value="" style="outlineConnect=0;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.aws3.documents;fillColor=#E05243;gradientColor=none;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="315" y="350" width="30" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="format_module_label" value="Notes Formatting" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="300" y="384" width="60" height="30" as="geometry" />
+        </mxCell>
+        
         <!-- AWS S3 Service -->
         <mxCell id="s3_service" value="" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=#60A337;gradientDirection=north;fillColor=#277116;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.s3;" vertex="1" parent="aws_services">
           <mxGeometry x="30" y="50" width="40" height="40" as="geometry" />

@@ -9,7 +9,7 @@ A tool for transcribing meeting audio and generating detailed meeting notes usin
 
 # Application GUI
 <div align="center">
-  <img src="./installer/Assets/appscreen.png" alt="Meeting Transcriber Application" width="400">
+  <img src="./installer/Assets/appscreen.png" alt="Meeting Transcriber Application" width="600">
 </div>
 
 ## Features
