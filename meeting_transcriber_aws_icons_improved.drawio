@@ -1,0 +1,108 @@
+<mxfile host="app.diagrams.net" modified="2024-05-10T12:00:00.000Z" agent="Mozilla/5.0" etag="meeting-transcriber-aws-diagram" version="15.8.3" type="device">
+  <diagram id="meeting-transcriber-architecture" name="Meeting Transcriber Architecture">
+    <mxGraphModel dx="1422" dy="798" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- Title -->
+        <mxCell id="title" value="Meeting Transcriber Architecture with AWS Icons" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="250" y="20" width="600" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- AWS Services Container -->
+        <mxCell id="aws_services" value="AWS Cloud" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];outlineConnect=0;gradientColor=none;html=1;whiteSpace=wrap;fontSize=12;fontStyle=0;container=1;pointerEvents=0;collapsible=0;recursiveResize=0;shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_aws_cloud;strokeColor=#232F3E;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontColor=#232F3E;dashed=0;" vertex="1" parent="1">
+          <mxGeometry x="600" y="80" width="280" height="380" as="geometry" />
+        </mxCell>
+        
+        <!-- AWS S3 Service -->
+        <mxCell id="s3_service" value="" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=#60A337;gradientDirection=north;fillColor=#277116;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.s3;" vertex="1" parent="aws_services">
+          <mxGeometry x="30" y="50" width="40" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="s3_label" value="Amazon S3" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" vertex="1" parent="aws_services">
+          <mxGeometry x="20" y="90" width="60" height="20" as="geometry" />
+        </mxCell>
+        
+        <!-- AWS Transcribe Service -->
+        <mxCell id="transcribe_service" value="" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=#4AB29A;gradientDirection=north;fillColor=#116D5B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.transcribe;" vertex="1" parent="aws_services">
+          <mxGeometry x="120" y="50" width="40" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="transcribe_label" value="Amazon Transcribe" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" vertex="1" parent="aws_services">
+          <mxGeometry x="100" y="90" width="80" height="20" as="geometry" />
+        </mxCell>
+        
+        <!-- AWS Bedrock Service -->
+        <mxCell id="bedrock_service" value="" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=#4AB29A;gradientDirection=north;fillColor=#116D5B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock;" vertex="1" parent="aws_services">
+          <mxGeometry x="210" y="50" width="40" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="bedrock_label" value="Amazon Bedrock" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" vertex="1" parent="aws_services">
+          <mxGeometry x="190" y="90" width="80" height="20" as="geometry" />
+        </mxCell>
+        
+        <!-- AWS Service Details -->
+        <mxCell id="s3_details" value="- Audio file storage&#xa;- Temporary transcript storage" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=10;" vertex="1" parent="aws_services">
+          <mxGeometry x="20" y="110" width="80" height="40" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="transcribe_details" value="- Speech-to-text conversion&#xa;- Speaker diarization&#xa;- Multiple language support" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=10;" vertex="1" parent="aws_services">
+          <mxGeometry x="100" y="110" width="80" height="50" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="bedrock_details" value="- AI-powered summarization&#xa;- Claude/Titan models&#xa;- Structured meeting notes" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=10;" vertex="1" parent="aws_services">
+          <mxGeometry x="190" y="110" width="80" height="50" as="geometry" />
+        </mxCell>
+        
+        <!-- Application Components Container -->
+        <mxCell id="app_container" value="Meeting Transcriber Application" style="fillColor=#EFF0F3;strokeColor=#5A6C86;dashed=1;verticalAlign=top;fontStyle=1;fontColor=#5A6C86;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="220" y="80" width="340" height="380" as="geometry" />
+        </mxCell>
+        
+        <!-- GUI Component -->
+        <mxCell id="gui_component" value="" style="outlineConnect=0;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.aws3.management_console;fillColor=#759C3E;gradientColor=none;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="250" y="120" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="gui_label" value="GUI Interface" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="235" y="150" width="60" height="20" as="geometry" />
+        </mxCell>
+        
+        <!-- Core Processing Component -->
+        <mxCell id="core_component" value="" style="outlineConnect=0;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.aws3.worker;fillColor=#D9A741;gradientColor=none;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="375" y="120" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="core_label" value="Core Processing" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="360" y="150" width="60" height="20" as="geometry" />
+        </mxCell>
+        
+        <!-- Core Processing Details -->
+        <mxCell id="core_details" value="- Audio File Processing&#xa;- Transcription Worker&#xa;- File I/O Operations&#xa;- Error Handling&#xa;- Fallback Processing" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="330" y="170" width="120" height="70" as="geometry" />
+        </mxCell>
+        
+        <!-- Module Components -->
+        <!-- Transcription Module -->
+        <mxCell id="transcribe_module" value="" style="outlineConnect=0;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.aws3.android;fillColor=#8C4FFF;gradientColor=none;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="250" y="250" width="30" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="transcribe_module_label" value="Transcription Module" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="235" y="284" width="60" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- Summarization Module -->
+        <mxCell id="summarize_module" value="" style="outlineConnect=0;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.aws3.android;fillColor=#5294CF;gradientColor=none;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="375" y="250" width="30" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="summarize_module_label" value="Summarization Module" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="360" y="284" width="60" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- Formatting Module -->
+        <mxCell id="format_module" value="" style="outlineConnect=0;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.aws3.documents;fillColor=#E05243;gradientColor=none;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="315" y="350" width="30" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="format_module_label" value="Notes Formatting" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="300" y="384" width="60" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
