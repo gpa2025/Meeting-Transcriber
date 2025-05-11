@@ -18,7 +18,7 @@ Author: Gianpaolo Albanese
 E-Mail: albaneg@yahoo.com
 Work Email: gianpaoa@amazon.com
 Date: 05-09-2024
-Version: 1.0
+Version: 1.1
 Assisted by: Amazon Q for VS Code
 """
 
@@ -145,6 +145,9 @@ def format_simple_notes(summary, key_points, action_items, meeting_date=None):
     notes += "## Full Transcript\n\n"
     notes += "The full transcript is available in the attached file.\n"
     
+    # Add a timestamp for when the notes were generated
+    notes += f"\n---\n*Notes generated on {datetime.now().strftime('%Y-%m-%d at %H:%M:%S')}*\n"
+    
     return notes
 
 def check_aws_credentials():
@@ -163,6 +166,28 @@ def check_aws_credentials():
     if not os.environ.get('BEDROCK_MODEL_ID'):
         print("WARNING: BEDROCK_MODEL_ID not specified in .env file. Using default: anthropic.claude-v2")
 
+def get_file_modified_date(file_path):
+    """
+    Get the modified date of a file.
+    
+    Args:
+        file_path (str): Path to the file
+        
+    Returns:
+        datetime: The file's modification date
+    """
+    try:
+        # Get file modification time (consistent across platforms)
+        if os.path.exists(file_path):
+            file_time = os.path.getmtime(file_path)
+            return datetime.fromtimestamp(file_time)
+        else:
+            logger.warning(f"File not found: {file_path}")
+            return datetime.now()
+    except Exception as e:
+        logger.warning(f"Could not get file date: {e}")
+        return datetime.now()
+
 def main():
     """Main function to process audio and generate meeting notes."""
     # Load environment variables
@@ -174,7 +199,7 @@ def main():
     parser = argparse.ArgumentParser(description="Direct Meeting Transcriber")
     parser.add_argument("audio_file", help="Path to the audio file to transcribe")
     parser.add_argument("--output_dir", default="output", help="Directory to save output files")
-    parser.add_argument("--meeting_date", help="Meeting date in YYYY-MM-DD format (defaults to today)")
+    parser.add_argument("--meeting_date", help="Meeting date in YYYY-MM-DD format (defaults to audio file's modified date)")
     args = parser.parse_args()
     
     # Create output directory if it doesn't exist
@@ -183,16 +208,21 @@ def main():
     # Get base filename without extension
     base_filename = os.path.splitext(os.path.basename(args.audio_file))[0]
     
-    # Parse meeting date if provided
+    # Get the file's modified date to use as meeting date
+    file_modified_date = get_file_modified_date(args.audio_file)
+    
+    # Parse meeting date if provided, otherwise use file's modified date
     meeting_date = None
     if args.meeting_date:
         try:
             meeting_date = datetime.strptime(args.meeting_date, "%Y-%m-%d")
+            logger.info(f"Using provided meeting date: {meeting_date.strftime('%B %d, %Y')}")
         except ValueError:
-            logger.warning(f"Invalid date format: {args.meeting_date}. Using today's date.")
-            meeting_date = datetime.now()
+            logger.warning(f"Invalid date format: {args.meeting_date}. Using file's modified date.")
+            meeting_date = file_modified_date
     else:
-        meeting_date = datetime.now()
+        meeting_date = file_modified_date
+        logger.info(f"Using audio file's modified date as meeting date: {meeting_date.strftime('%B %d, %Y')}")
     
     try:
         # Step 1: Transcribe audio using AWS directly
@@ -254,9 +284,6 @@ def main():
                         'name': f"Speaker {speaker.split('_')[-1]}" if speaker.startswith('spk_') else speaker
                     })
             
-            # Import the enhanced formatting function at the top level to avoid import errors
-            import format_meeting_notes
-            
             # Format meeting notes with enhanced formatting
             meeting_notes = format_meeting_notes.format_enhanced_meeting_notes(
                 transcript=text_for_summary,
@@ -265,7 +292,7 @@ def main():
                 action_items=action_items,
                 participants=participants,
                 has_speaker_segments=isinstance(transcript, dict) and 'speaker_segments' in transcript,
-                meeting_date=meeting_date
+                meeting_date=meeting_date  # Use the file's modified date
             )
         except Exception as e:
             error_message = f"Error using AWS Bedrock: {e}"
@@ -295,8 +322,10 @@ def main():
                 print(f"- Detailed error: {str(e)}")
                 print("- Check your AWS credentials, network connection, and Bedrock model configuration")
             
-            # Exit with error
-            sys.exit(1)
+            # Fallback to simple summarization
+            print("\nFalling back to simple summarization...")
+            summary, key_points, action_items = simple_summarize(text_for_summary)
+            meeting_notes = format_simple_notes(summary, key_points, action_items, meeting_date)
         
         # Save meeting notes to file
         notes_file = os.path.join(args.output_dir, f"{base_filename}_meeting_notes.md")

@@ -4,6 +4,12 @@ Module for formatting meeting notes with enhanced detail.
 This module provides functions to format meeting notes in a structured way,
 with comprehensive summaries, key takeaways, action items with owners,
 and participant information.
+
+Author: Gianpaolo Albanese
+E-Mail: albaneg@yahoo.com
+Work Email: gianpaoa@amazon.com
+Date: 05-10-2024
+Version: 1.1
 """
 
 import os
@@ -44,7 +50,7 @@ def format_enhanced_meeting_notes(
     
     date_str = meeting_date.strftime("%B %d, %Y")
     
-    # Format the notes with a more professional header
+    # Format the notes with a professional header
     notes = f"# Meeting Notes - {date_str}\n\n"
     
     # Add summary section
@@ -53,51 +59,91 @@ def format_enhanced_meeting_notes(
     
     # Process key points to identify categories
     categorized_points = {}
+    decisions = []
+    technical_details = []
+    cost_considerations = []
+    risks_issues = []
     uncategorized_points = []
     
     for point in key_points:
         # Check if the point has a category prefix (e.g., "**Category**:" or "Category:")
-        category_match = re.match(r'\*\*([^*]+)\*\*:\s*(.*)', point) or re.match(r'([A-Za-z]+):\s*(.*)', point)
+        category_match = re.match(r'\*\*([^*]+)\*\*:\s*(.*)', point)
+        
         if category_match:
             category = category_match.group(1).strip()
             content = category_match.group(2).strip()
             
-            if category not in categorized_points:
-                categorized_points[category] = []
-            
-            categorized_points[category].append(content)
+            # Sort into specific categories
+            if category.lower() == 'decision':
+                decisions.append(content)
+            elif category.lower() == 'technical':
+                technical_details.append(content)
+            elif category.lower() == 'cost':
+                cost_considerations.append(content)
+            elif category.lower() == 'risk':
+                risks_issues.append(content)
+            else:
+                # Other categorized points
+                if category not in categorized_points:
+                    categorized_points[category] = []
+                categorized_points[category].append(content)
         else:
-            uncategorized_points.append(point)
+            # Check for plain "Category:" format
+            plain_category_match = re.match(r'([A-Za-z]+):\s*(.*)', point)
+            if plain_category_match:
+                category = plain_category_match.group(1).strip()
+                content = plain_category_match.group(2).strip()
+                
+                if category not in categorized_points:
+                    categorized_points[category] = []
+                
+                categorized_points[category].append(content)
+            else:
+                uncategorized_points.append(point)
     
-    # Add key takeaways section with categories if available
+    # Add key takeaways section with categories
     notes += "## Key Takeaways\n\n"
     
-    if categorized_points:
-        # Add categorized points
-        for category, points in categorized_points.items():
-            notes += f"### {category}\n\n"
-            for point in points:
-                notes += f"- {point}\n"
-            notes += "\n"
-        
-        # Add uncategorized points if any
-        if uncategorized_points:
-            notes += "### Additional Points\n\n"
-            for point in uncategorized_points:
-                notes += f"- {point}\n"
-            notes += "\n"
-    else:
-        # No categories, just list all points
-        for point in key_points:
+    # Add categorized points first
+    for category, points in categorized_points.items():
+        notes += f"### {category}\n\n"
+        for point in points:
             notes += f"- {point}\n"
         notes += "\n"
     
-    # Extract decisions from key points and summary
-    decisions = extract_decisions(key_points, summary)
+    # Add uncategorized points if any
+    if uncategorized_points:
+        notes += "### General Points\n\n"
+        for point in uncategorized_points:
+            notes += f"- {point}\n"
+        notes += "\n"
+    
+    # Add decisions section if available
     if decisions:
         notes += "## Decisions Made\n\n"
         for i, decision in enumerate(decisions, 1):
             notes += f"{i}. {decision}\n"
+        notes += "\n"
+    
+    # Add technical details section if available
+    if technical_details:
+        notes += "## Technical Details\n\n"
+        for i, detail in enumerate(technical_details, 1):
+            notes += f"{i}. {detail}\n"
+        notes += "\n"
+    
+    # Add cost considerations section if available
+    if cost_considerations:
+        notes += "## Cost and Resource Considerations\n\n"
+        for i, cost in enumerate(cost_considerations, 1):
+            notes += f"{i}. {cost}\n"
+        notes += "\n"
+    
+    # Add risks and issues section if available
+    if risks_issues:
+        notes += "## Risks and Issues\n\n"
+        for i, risk in enumerate(risks_issues, 1):
+            notes += f"{i}. {risk}\n"
         notes += "\n"
     
     # Add action items if available
@@ -106,38 +152,94 @@ def format_enhanced_meeting_notes(
         
         # Process action items to extract owners and deadlines
         processed_items = []
-        for i, item in enumerate(action_items, 1):
-            # Check for owner and deadline information
-            owner_deadline_match = re.search(r'\(Owner:\s*([^,)]+)(?:,\s*Deadline:\s*([^)]+))?\)', item)
-            owner_match = re.search(r'\(Owner:\s*([^)]+)\)', item)
-            
-            if owner_deadline_match:
-                # Item has owner and possibly deadline
-                action_text = re.sub(r'\s*\(Owner:.*?\)', '', item).strip()
-                owner = owner_deadline_match.group(1).strip()
-                deadline = owner_deadline_match.group(2).strip() if owner_deadline_match.group(2) else None
-                
-                if deadline:
-                    processed_items.append(f"{i}. {action_text} **[Owner: {owner}, Deadline: {deadline}]**")
-                else:
-                    processed_items.append(f"{i}. {action_text} **[Owner: {owner}]**")
-            elif owner_match:
-                # Item has just an owner
-                action_text = re.sub(r'\s*\(Owner:.*?\)', '', item).strip()
-                owner = owner_match.group(1).strip()
-                processed_items.append(f"{i}. {action_text} **[Owner: {owner}]**")
-            else:
-                # Try to infer an owner from the content
-                owner = infer_owner_from_text(item, participants)
-                if owner:
-                    processed_items.append(f"{i}. {item} **[Owner: {owner}]**")
-                else:
-                    processed_items.append(f"{i}. {item}")
         
-        # Add processed items to notes
-        for item in processed_items:
-            notes += f"{item}\n"
-        notes += "\n"
+        # Group action items by category
+        categorized_actions = {}
+        uncategorized_actions = []
+        
+        for item in action_items:
+            # Check if the item has a category prefix
+            category_match = re.match(r'\*\*([^*]+)\*\*:\s*(.*)', item)
+            
+            if category_match:
+                category = category_match.group(1).strip()
+                content = category_match.group(2).strip()
+                
+                if category not in categorized_actions:
+                    categorized_actions[category] = []
+                
+                categorized_actions[category].append(content)
+            else:
+                uncategorized_actions.append(item)
+        
+        # Process each category of action items
+        for category, items in categorized_actions.items():
+            notes += f"### {category}\n\n"
+            
+            for i, item in enumerate(items, 1):
+                # Check for owner and deadline information
+                owner_deadline_match = re.search(r'\(Owner:\s*([^,)]+)(?:,\s*Deadline:\s*([^)]+))?\)', item)
+                owner_match = re.search(r'\(Owner:\s*([^)]+)\)', item)
+                
+                if owner_deadline_match:
+                    # Item has owner and possibly deadline
+                    action_text = re.sub(r'\s*\(Owner:.*?\)', '', item).strip()
+                    owner = owner_deadline_match.group(1).strip()
+                    deadline = owner_deadline_match.group(2).strip() if owner_deadline_match.group(2) else None
+                    
+                    if deadline:
+                        notes += f"{i}. {action_text} **[Owner: {owner}, Deadline: {deadline}]**\n"
+                    else:
+                        notes += f"{i}. {action_text} **[Owner: {owner}]**\n"
+                elif owner_match:
+                    # Item has just an owner
+                    action_text = re.sub(r'\s*\(Owner:.*?\)', '', item).strip()
+                    owner = owner_match.group(1).strip()
+                    notes += f"{i}. {action_text} **[Owner: {owner}]**\n"
+                else:
+                    # Try to infer an owner from the content
+                    owner = infer_owner_from_text(item, participants)
+                    if owner:
+                        notes += f"{i}. {item} **[Owner: {owner}]**\n"
+                    else:
+                        notes += f"{i}. {item}\n"
+            
+            notes += "\n"
+        
+        # Process uncategorized action items
+        if uncategorized_actions:
+            if categorized_actions:
+                notes += "### Other Action Items\n\n"
+            
+            for i, item in enumerate(uncategorized_actions, 1):
+                # Check for owner and deadline information
+                owner_deadline_match = re.search(r'\(Owner:\s*([^,)]+)(?:,\s*Deadline:\s*([^)]+))?\)', item)
+                owner_match = re.search(r'\(Owner:\s*([^)]+)\)', item)
+                
+                if owner_deadline_match:
+                    # Item has owner and possibly deadline
+                    action_text = re.sub(r'\s*\(Owner:.*?\)', '', item).strip()
+                    owner = owner_deadline_match.group(1).strip()
+                    deadline = owner_deadline_match.group(2).strip() if owner_deadline_match.group(2) else None
+                    
+                    if deadline:
+                        notes += f"{i}. {action_text} **[Owner: {owner}, Deadline: {deadline}]**\n"
+                    else:
+                        notes += f"{i}. {action_text} **[Owner: {owner}]**\n"
+                elif owner_match:
+                    # Item has just an owner
+                    action_text = re.sub(r'\s*\(Owner:.*?\)', '', item).strip()
+                    owner = owner_match.group(1).strip()
+                    notes += f"{i}. {action_text} **[Owner: {owner}]**\n"
+                else:
+                    # Try to infer an owner from the content
+                    owner = infer_owner_from_text(item, participants)
+                    if owner:
+                        notes += f"{i}. {item} **[Owner: {owner}]**\n"
+                    else:
+                        notes += f"{i}. {item}\n"
+            
+            notes += "\n"
     
     # Add participants if identified
     if participants and len(participants) > 0:
@@ -165,6 +267,9 @@ def format_enhanced_meeting_notes(
         notes += "The full transcript with speaker identification is available in the attached file.\n"
     else:
         notes += "The full transcript is available in the attached file.\n"
+    
+    # Add a timestamp for when the notes were generated
+    notes += f"\n---\n*Notes generated on {datetime.now().strftime('%Y-%m-%d at %H:%M:%S')}*\n"
     
     return notes
 
@@ -206,8 +311,8 @@ def extract_decisions(key_points: List[str], summary: str) -> List[str]:
                 if sentence not in decisions:
                     decisions.append(sentence)
     
-    # Limit to top 5 decisions
-    return decisions[:5]
+    # Limit to top 8 decisions
+    return decisions[:8]
 
 
 def infer_owner_from_text(text: str, participants: List[Dict[str, str]]) -> Optional[str]:
