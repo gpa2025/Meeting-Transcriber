@@ -4,7 +4,7 @@ A tool for transcribing meeting audio and generating detailed meeting notes usin
 
 # Architectural Diagram
 <div align="center">
-  <img src="./meeting_transcriber_architecture.drawio" alt="Meeting Transcriber Architecture" width="800">
+  <img src="./installer/Assets/diagram.png" alt="Meeting Transcriber Architecture" width="800">
 </div>
 
 # Application GUI
