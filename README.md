@@ -2,8 +2,14 @@
 
 A tool for transcribing meeting audio and generating detailed meeting notes using AWS services.
 
+# Architectural Diagram
 <div align="center">
-  <img src="./installer/Assets/appscreen.png" alt="Meeting Transcriber Application" width="800">
+  <img src="./installer/Assets/diagram.png" alt="Meeting Transcriber Architecture" width="800">
+</div>
+
+# Application GUI
+<div align="center">
+  <img src="./installer/Assets/appscreen.png" alt="Meeting Transcriber Application" width="600">
 </div>
 
 ## Features
