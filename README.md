@@ -35,7 +35,7 @@ A tool for transcribing meeting audio and generating detailed meeting notes usin
 
 ### Using the Python Launcher (Recommended)
 
-1. Download the latest release (`MeetingTranscriberPython.zip`) from the releases page
+1. Download the latest release (`MeetingTranscriberPython.zip`) from the releases page, found in the "DIST" folder.
 2. Extract all files to a folder of your choice
 3. Run `Setup.bat` to:
    - Install required Python packages
