@@ -50,10 +50,17 @@ def generate_notes_with_bedrock(transcript):
         if not (os.environ.get('AWS_ACCESS_KEY_ID') and os.environ.get('AWS_SECRET_ACCESS_KEY')):
             raise EnvironmentError("AWS credentials not found. Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.")
         
-        # Create a client for the AWS Bedrock service
+        # Create a client for the AWS Bedrock service with extended timeout
+        from botocore.config import Config
+        config = Config(
+            read_timeout=900,  # 15 minutes
+            connect_timeout=60,
+            retries={'max_attempts': 3}
+        )
         bedrock_runtime = boto3.client(
             service_name='bedrock-runtime',
-            region_name=os.environ.get('AWS_REGION', 'us-east-1')
+            region_name=os.environ.get('AWS_REGION', 'us-east-1'),
+            config=config
         )
         
         # Get model parameters from environment variables
