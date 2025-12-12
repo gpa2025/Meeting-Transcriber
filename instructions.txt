@@ -1,0 +1,120 @@
+# Meeting Transcriber - Instructions
+
+## Project Structure
+- `main.py` - The main script that orchestrates the entire process
+- `transcriber.py` - Handles audio transcription using either local speech recognition or AWS Transcribe
+- `summarizer.py` - Uses AI to generate meeting notes and extract key takeaways
+- `utils.py` - Utility functions for logging, file operations, etc.
+- `example.py` - An example script showing how to use the application
+- `.env.example` - Template for environment variables
+- `.gitignore` - Standard gitignore file for Python projects
+- `README.md` - Documentation for the project
+
+## How It Works
+
+1. **Audio Transcription**: The application takes an audio recording as input and transcribes it to text using either:
+   - Local transcription with the SpeechRecognition library
+   - AWS Transcribe for better accuracy (requires AWS credentials)
+
+2. **AI-Powered Summarization**: The transcript is processed using transformer models to:
+   - Generate a concise summary of the meeting
+   - Extract key takeaways and action items
+   - Identify potential participants
+
+3. **Output**: The application produces:
+   - A text file with the complete transcript
+   - A markdown file with formatted meeting notes including summary and key takeaways
+
+## How to Use
+
+1. Install the dependencies:
+   ```
+   pip install -r requirements.txt
+   ```
+
+2. For AWS Transcribe (optional):
+   - Copy `.env.example` to `.env`
+   - Add your AWS credentials to the `.env` file
+
+3. Run the application:
+   ```
+   python main.py path/to/your/meeting_recording.mp3
+   ```
+
+4. Find the output in the `output` directory (or specify a custom directory with `--output_dir`)
+
+## Command Line Options
+
+```
+python main.py audio_file [--output_dir OUTPUT_DIR] [--transcription_method {local,aws}]
+```
+
+- `audio_file`: Path to the audio file to transcribe
+- `--output_dir`: Directory to save output files (default: "output")
+- `--transcription_method`: Method to use for transcription (local or AWS) (default: "local")
+
+## Example Usage
+
+### Basic Usage with Local Transcription
+```
+python main.py meeting_recording.mp3
+```
+
+### Using AWS Transcribe
+```
+python main.py meeting_recording.mp3 --transcription_method aws
+```
+
+### Specifying Output Directory
+```
+python main.py meeting_recording.mp3 --output_dir my_meeting_notes
+```
+
+## Running the Example Script
+
+If you want to test the application with a sample audio file:
+
+1. Place a sample audio file named `sample_meeting.mp3` in the project directory
+2. Run the example script:
+   ```
+   python example.py
+   ```
+
+## Next Steps
+
+1. **Test with a real audio file**: Try running the application with a meeting recording to see how well it works.
+
+2. **Fine-tune the AI models**: You might want to adjust the parameters in `summarizer.py` to get better results.
+
+3. **Add more features**: Consider adding features like:
+   - Speaker diarization (identifying who is speaking)
+   - Action item extraction
+   - Integration with calendar or task management systems
+
+4. **Create a simple web interface**: You could add a web interface to make it easier to use.
+
+## Troubleshooting
+
+1. **Missing dependencies**: Make sure all dependencies are installed with `pip install -r requirements.txt`
+
+2. **NLTK or spaCy data missing**: If you get errors about missing NLTK data or spaCy models, run:
+   ```python
+   import nltk
+   import spacy
+   
+   nltk.download('punkt')
+   spacy.cli.download("en_core_web_sm")
+   ```
+
+3. **AWS credentials**: If using AWS Transcribe, ensure your AWS credentials are correctly set in the `.env` file
+
+4. **Audio format issues**: If you have issues with audio transcription, try converting your audio to WAV format
+
+5. **Memory errors**: If you get memory errors when processing large audio files, try splitting the audio into smaller chunks
+
+## Additional Resources
+
+- SpeechRecognition documentation: https://pypi.org/project/SpeechRecognition/
+- AWS Transcribe documentation: https://docs.aws.amazon.com/transcribe/
+- Hugging Face Transformers: https://huggingface.co/docs/transformers/
+- spaCy documentation: https://spacy.io/usage

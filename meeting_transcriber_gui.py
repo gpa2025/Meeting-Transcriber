@@ -29,6 +29,7 @@ from PyQt5.QtGui import QIcon, QPixmap
 # Import the transcription and summarization modules directly
 import aws_transcribe
 from summarizer_bedrock import generate_notes_with_bedrock
+from summarizer_free import generate_notes_with_free_models
 import format_meeting_notes
 
 # Setup logging
@@ -119,12 +120,18 @@ class TranscriptionWorker(QThread):
                 self.progress_update.emit(f"Transcript saved to {transcript_file}")
                 text_for_summary = transcript
             
-            # Step 2: Generate meeting notes with AWS Bedrock
-            self.progress_update.emit("Generating meeting notes with AWS Bedrock... (this may take a while)")
-            self.progress_update.emit(f"Using model: {os.environ.get('BEDROCK_MODEL_ID', 'anthropic.claude-v2')}")
+            # Step 2: Generate meeting notes
+            model_id = os.environ.get('BEDROCK_MODEL_ID', 'anthropic.claude-3-5-sonnet-20241022-v2:0')
             
-            # Use AWS Bedrock for advanced summarization
-            summary, key_points, action_items = generate_notes_with_bedrock(text_for_summary)
+            if model_id.startswith(('ollama:', 'hf:', 'openai-free:')):
+                self.progress_update.emit("Generating meeting notes with free models... (this may take a while)")
+                self.progress_update.emit(f"Using free model: {model_id}")
+                os.environ['FREE_MODEL_ID'] = model_id
+                summary, key_points, action_items = generate_notes_with_free_models(text_for_summary)
+            else:
+                self.progress_update.emit("Generating meeting notes with AWS Bedrock... (this may take a while)")
+                self.progress_update.emit(f"Using model: {model_id}")
+                summary, key_points, action_items = generate_notes_with_bedrock(text_for_summary)
             
             # Extract participants if available
             participants = []
@@ -215,9 +222,41 @@ class MeetingTranscriberGUI(QMainWindow):
         
         self.model_input = QComboBox()
         self.model_input.addItems([
-            "anthropic.claude-v2",
-            "anthropic.claude-instant-v1",
-            "amazon.titan-text-express-v1"
+            # AWS Bedrock Models
+            "anthropic.claude-3-5-sonnet-20241022-v2:0",
+            "anthropic.claude-3-5-sonnet-20240620-v1:0",
+            "anthropic.claude-3-5-haiku-20241022-v1:0",
+            "anthropic.claude-3-opus-20240229-v1:0",
+            "anthropic.claude-3-sonnet-20240229-v1:0",
+            "anthropic.claude-3-haiku-20240307-v1:0",
+            "amazon.nova-pro-v1:0",
+            "amazon.nova-lite-v1:0",
+            "amazon.nova-micro-v1:0",
+            "amazon.titan-text-premier-v1:0",
+            "amazon.titan-text-express-v1",
+            "meta.llama3-2-90b-instruct-v1:0",
+            "meta.llama3-2-11b-instruct-v1:0",
+            "meta.llama3-2-3b-instruct-v1:0",
+            "meta.llama3-2-1b-instruct-v1:0",
+            "meta.llama3-1-405b-instruct-v1:0",
+            "meta.llama3-1-70b-instruct-v1:0",
+            "meta.llama3-1-8b-instruct-v1:0",
+            "mistral.mistral-large-2407-v1:0",
+            "mistral.mistral-small-2402-v1:0",
+            # Free Models (Ollama)
+            "ollama:llama3.2",
+            "ollama:llama3.1",
+            "ollama:mistral",
+            "ollama:codellama",
+            "ollama:phi3",
+            # Free Models (Hugging Face)
+            "hf:microsoft/DialoGPT-large",
+            "hf:microsoft/DialoGPT-medium",
+            "hf:google/flan-t5-large",
+            # Free Models (OpenAI-compatible APIs)
+            "openai-free:meta-llama/Llama-2-7b-chat-hf",
+            "openai-free:mistralai/Mistral-7B-Instruct-v0.1",
+            "openai-free:NousResearch/Nous-Hermes-2-Yi-34B"
         ])
         self.temperature_input = QLineEdit("0.7")
         self.max_tokens_input = QLineEdit("4096")
@@ -374,7 +413,7 @@ class MeetingTranscriberGUI(QMainWindow):
                 self.s3_bucket_input.setText(config.get("aws_s3_bucket", ""))
                 
                 # Load Bedrock settings
-                self.model_input.setCurrentText(config.get("bedrock_model", "anthropic.claude-v2"))
+                self.model_input.setCurrentText(config.get("bedrock_model", "anthropic.claude-3-5-sonnet-20241022-v2:0"))
                 self.temperature_input.setText(str(config.get("temperature", "0.7")))
                 self.max_tokens_input.setText(str(config.get("max_tokens", "4096")))
                 self.system_prompt_input.setText(config.get("system_prompt", "You are an AI assistant that creates detailed meeting notes from transcripts."))

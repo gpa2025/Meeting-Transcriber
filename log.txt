@@ -1,0 +1,11 @@
+Looking in indexes: https://pypi.org/simple, https://plugin.us-east-1.prod.workshops.aws
+Collecting pydub==0.25.1 (from -r requirements.txt (line 2))
+  Using cached pydub-0.25.1-py2.py3-none-any.whl.metadata (1.4 kB)
+Collecting SpeechRecognition==3.10.0 (from -r requirements.txt (line 3))
+  Using cached SpeechRecognition-3.10.0-py2.py3-none-any.whl.metadata (28 kB)
+Collecting nltk==3.8.1 (from -r requirements.txt (line 6))
+  Using cached nltk-3.8.1-py3-none-any.whl.metadata (2.8 kB)
+Collecting spacy==3.7.2 (from -r requirements.txt (line 7))
+  Using cached spacy-3.7.2.tar.gz (1.3 MB)
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'error'

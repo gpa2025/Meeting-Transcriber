@@ -64,11 +64,7 @@ def generate_notes_with_bedrock(transcript):
         )
         
         # Get model parameters from environment variables
-        model_id = os.environ.get('BEDROCK_MODEL_ID', 'anthropic.claude-v2')
-        # Force model to Claude v2 if using Claude 3 (which requires inference profiles)
-        if 'claude-3' in model_id:
-            logger.warning(f"Claude 3 model detected ({model_id}). Falling back to Claude v2 which doesn't require inference profiles.")
-            model_id = 'anthropic.claude-v2'
+        model_id = os.environ.get('BEDROCK_MODEL_ID', 'anthropic.claude-3-5-sonnet-20241022-v2:0')
         temperature = float(os.environ.get('MODEL_TEMPERATURE', '0.7'))
         max_tokens = int(os.environ.get('MAX_TOKENS', '4096'))
         system_prompt = os.environ.get('SYSTEM_PROMPT', 
@@ -81,20 +77,40 @@ def generate_notes_with_bedrock(transcript):
         logger.info(f"Calling AWS Bedrock with model: {model_id}")
         
         if 'anthropic.claude' in model_id:
-            # Claude models
-            response = bedrock_runtime.invoke_model(
-                modelId=model_id,
-                body=json.dumps({
-                    "prompt": prompt,
-                    "max_tokens_to_sample": max_tokens,
-                    "temperature": temperature,
-                })
-            )
-            response_body = json.loads(response['body'].read())
-            result_text = response_body.get('completion', '')
+            # Claude models - handle both legacy and new formats
+            if 'claude-3' in model_id or 'claude-v2' not in model_id:
+                # Claude 3+ models use Messages API
+                response = bedrock_runtime.invoke_model(
+                    modelId=model_id,
+                    body=json.dumps({
+                        "anthropic_version": "bedrock-2023-05-31",
+                        "max_tokens": max_tokens,
+                        "temperature": temperature,
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": prompt
+                            }
+                        ]
+                    })
+                )
+                response_body = json.loads(response['body'].read())
+                result_text = response_body.get('content', [{}])[0].get('text', '')
+            else:
+                # Legacy Claude models (Claude v1/v2)
+                response = bedrock_runtime.invoke_model(
+                    modelId=model_id,
+                    body=json.dumps({
+                        "prompt": prompt,
+                        "max_tokens_to_sample": max_tokens,
+                        "temperature": temperature,
+                    })
+                )
+                response_body = json.loads(response['body'].read())
+                result_text = response_body.get('completion', '')
             
-        elif 'amazon.titan' in model_id:
-            # Amazon Titan models
+        elif 'amazon.titan' in model_id or 'amazon.nova' in model_id:
+            # Amazon Titan and Nova models
             response = bedrock_runtime.invoke_model(
                 modelId=model_id,
                 body=json.dumps({
@@ -108,6 +124,34 @@ def generate_notes_with_bedrock(transcript):
             )
             response_body = json.loads(response['body'].read())
             result_text = response_body.get('results', [{}])[0].get('outputText', '')
+            
+        elif 'meta.llama' in model_id:
+            # Meta Llama models
+            response = bedrock_runtime.invoke_model(
+                modelId=model_id,
+                body=json.dumps({
+                    "prompt": prompt,
+                    "max_gen_len": max_tokens,
+                    "temperature": temperature,
+                    "top_p": 0.9
+                })
+            )
+            response_body = json.loads(response['body'].read())
+            result_text = response_body.get('generation', '')
+            
+        elif 'mistral' in model_id:
+            # Mistral models
+            response = bedrock_runtime.invoke_model(
+                modelId=model_id,
+                body=json.dumps({
+                    "prompt": prompt,
+                    "max_tokens": max_tokens,
+                    "temperature": temperature,
+                    "top_p": 0.9
+                })
+            )
+            response_body = json.loads(response['body'].read())
+            result_text = response_body.get('outputs', [{}])[0].get('text', '')
             
         else:
             # Generic approach for other models
