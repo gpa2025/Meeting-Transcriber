@@ -93,8 +93,8 @@ def build_exe():
             position = ((256 - text_width) // 2, (256 - text_height) // 2 - 20)  # Move up a bit
             draw.text(position, initials_text, fill=(255, 255, 255), font=main_font)
             
-            # Draw "Meeting Transcriber V1" text
-            app_text = "Meeting Transcriber V1"
+            # Draw "Meeting Transcriber V1.1" text
+            app_text = "Meeting Transcriber V1.1"
             # For newer Pillow versions
             if hasattr(draw, 'textbbox'):
                 bbox = draw.textbbox((0, 0), app_text, font=small_font)
@@ -148,7 +148,7 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[('icon.ico', '.')],  # Include icon file in the bundle
-    hiddenimports=['boto3', 'botocore', 'winshell', 'win32com', 'meeting_transcriber_gui'],
+    hiddenimports=['boto3', 'botocore', 'winshell', 'win32com', 'meeting_transcriber_gui', 'requests', 'urllib3', 'certifi', 'charset_normalizer'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=['splash_hook.py'],  # Add splash hook

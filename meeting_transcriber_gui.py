@@ -76,6 +76,7 @@ class TranscriptionWorker(QThread):
             os.environ["ENABLE_SPEAKER_DIARIZATION"] = "true" if self.aws_settings["enable_diarization"] else "false"
             os.environ["MAX_SPEAKER_LABELS"] = self.aws_settings["max_speakers"]
             os.environ["LOCAL_STORAGE_DIR"] = self.aws_settings["local_storage_dir"]
+            os.environ["TRANSCRIPTION_METHOD"] = self.aws_settings["transcription_method"]
             
             # Create output directory if it doesn't exist
             os.makedirs(self.output_dir, exist_ok=True)
@@ -101,8 +102,16 @@ class TranscriptionWorker(QThread):
                 self.progress_update.emit(f"Warning: Could not get file date, using current date: {e}")
             
             # Step 1: Transcribe audio
-            self.progress_update.emit("Transcribing audio file... (this may take a while)")
-            transcript = aws_transcribe.transcribe_with_aws(self.audio_file)
+            transcription_method = os.environ.get('TRANSCRIPTION_METHOD', 'AWS Transcribe (Premium)')
+            
+            if "Local" in transcription_method:
+                self.progress_update.emit("Transcribing audio file locally... (this may take a while)")
+                # Import local transcription function
+                from transcriber import transcribe_audio
+                transcript = transcribe_audio(self.audio_file, method="local")
+            else:
+                self.progress_update.emit("Transcribing audio file with AWS... (this may take a while)")
+                transcript = aws_transcribe.transcribe_with_aws(self.audio_file)
             
             # Save transcript to file
             if isinstance(transcript, dict) and 'speaker_segments' in transcript:
@@ -175,7 +184,17 @@ class TranscriptionWorker(QThread):
             self.save_to_file(meeting_notes, notes_file)
             self.progress_update.emit(f"Meeting notes saved to {notes_file}")
             
-            self.finished_signal.emit(True, "Transcription and summarization completed successfully!")
+            # Open output directory
+            import subprocess
+            import sys
+            if sys.platform == 'win32':
+                subprocess.Popen(['explorer', self.output_dir])
+            elif sys.platform == 'darwin':
+                subprocess.Popen(['open', self.output_dir])
+            else:
+                subprocess.Popen(['xdg-open', self.output_dir])
+            
+            self.finished_signal.emit(True, "Transcription and summarization completed successfully!\nOutput directory opened.")
                 
         except Exception as e:
             logger.error(f"Error in transcription worker: {e}")
@@ -242,10 +261,18 @@ class MeetingTranscriberGUI(QMainWindow):
         local_layout.addRow("Data Folder:", local_storage_layout)
         local_group.setLayout(local_layout)
         
-        # Bedrock Settings Group
-        bedrock_group = QGroupBox("Bedrock Settings")
+        # AI Model Settings Group
+        bedrock_group = QGroupBox("AI Model Settings")
         bedrock_layout = QFormLayout()
         
+        # Transcription Method Selection
+        self.transcription_input = QComboBox()
+        self.transcription_input.addItems([
+            "AWS Transcribe (Premium)",
+            "Local SpeechRecognition (Free)"
+        ])
+        
+        # AI Model for Summarization
         self.model_input = QComboBox()
         self.model_input.addItems([
             # AWS Bedrock Models
@@ -290,7 +317,8 @@ class MeetingTranscriberGUI(QMainWindow):
         self.system_prompt_input.setPlaceholderText("Enter system prompt here...")
         self.system_prompt_input.setMaximumHeight(100)
         
-        bedrock_layout.addRow("Model:", self.model_input)
+        bedrock_layout.addRow("Transcription:", self.transcription_input)
+        bedrock_layout.addRow("AI Model:", self.model_input)
         bedrock_layout.addRow("Temperature:", self.temperature_input)
         bedrock_layout.addRow("Max Tokens:", self.max_tokens_input)
         bedrock_layout.addRow("System Prompt:", self.system_prompt_input)
@@ -563,23 +591,25 @@ class MeetingTranscriberGUI(QMainWindow):
             QMessageBox.warning(self, "Missing Input", "Please select an output directory.")
             return
         
-        if not is_free_model:
-            if not self.access_key_input.text() or not self.secret_key_input.text():
-                QMessageBox.warning(self, "Missing Credentials", "Please enter AWS access key and secret key for AWS models.")
-                return
-        
-        # Check model type for validation
+        # Check transcription method and model for validation
+        transcription_method = self.transcription_input.currentText()
         model_id = self.model_input.currentText()
-        is_free_model = model_id.startswith(('ollama:', 'hf:', 'openai-free:'))
+        uses_aws_transcribe = "AWS Transcribe" in transcription_method
+        uses_aws_model = not model_id.startswith(('ollama:', 'hf:', 'openai-free:'))
         
-        if is_free_model:
-            if not self.local_storage_input.text():
-                QMessageBox.warning(self, "Missing Input", "Please select a local storage directory for free models.")
+        # Validate AWS credentials if using AWS services
+        if uses_aws_transcribe or uses_aws_model:
+            if not self.access_key_input.text() or not self.secret_key_input.text():
+                QMessageBox.warning(self, "Missing Credentials", "Please enter AWS access key and secret key for AWS services.")
                 return
-        else:
-            if not self.s3_bucket_input.text():
-                QMessageBox.warning(self, "Missing Input", "Please enter an S3 bucket name for AWS models.")
+            if uses_aws_transcribe and not self.s3_bucket_input.text():
+                QMessageBox.warning(self, "Missing Input", "Please enter an S3 bucket name for AWS Transcribe.")
                 return
+        
+        # Validate local storage for free models
+        if not uses_aws_model and not self.local_storage_input.text():
+            QMessageBox.warning(self, "Missing Input", "Please select a local storage directory for free models.")
+            return
         
         # Collect AWS credentials
         aws_credentials = {
@@ -598,7 +628,8 @@ class MeetingTranscriberGUI(QMainWindow):
             "language_code": self.language_input.currentText(),
             "enable_diarization": self.diarization_input.currentText() == "Enabled",
             "max_speakers": self.max_speakers_input.text(),
-            "local_storage_dir": self.local_storage_input.text()
+            "local_storage_dir": self.local_storage_input.text(),
+            "transcription_method": self.transcription_input.currentText()
         }
         
         # Clear log output

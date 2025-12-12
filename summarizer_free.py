@@ -47,79 +47,101 @@ def generate_notes_with_free_models(transcript):
 
 def generate_with_ollama(transcript, model_name):
     """Generate notes using local Ollama instance."""
-    ollama_url = os.environ.get('OLLAMA_URL', 'http://localhost:11434')
-    
-    prompt = create_simple_prompt(transcript)
-    
-    response = requests.post(f"{ollama_url}/api/generate", json={
-        "model": model_name,
-        "prompt": prompt,
-        "stream": False,
-        "options": {
-            "temperature": float(os.environ.get('MODEL_TEMPERATURE', '0.7')),
-            "num_predict": int(os.environ.get('MAX_TOKENS', '4096'))
-        }
-    })
-    
-    if response.status_code == 200:
-        result = response.json()
-        return parse_simple_response(result.get('response', ''))
-    else:
-        raise Exception(f"Ollama API error: {response.status_code}")
+    try:
+        ollama_url = os.environ.get('OLLAMA_URL', 'http://localhost:11434')
+        logger.info(f"Connecting to Ollama at {ollama_url} with model {model_name}")
+        
+        prompt = create_simple_prompt(transcript)
+        
+        response = requests.post(f"{ollama_url}/api/generate", json={
+            "model": model_name,
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": float(os.environ.get('MODEL_TEMPERATURE', '0.7')),
+                "num_predict": int(os.environ.get('MAX_TOKENS', '4096'))
+            }
+        }, timeout=300)
+        
+        if response.status_code == 200:
+            result = response.json()
+            return parse_simple_response(result.get('response', ''))
+        else:
+            logger.error(f"Ollama API error: {response.status_code} - {response.text}")
+            raise Exception(f"Ollama API error: {response.status_code}. Make sure Ollama is running and model '{model_name}' is installed.")
+    except requests.exceptions.ConnectionError:
+        raise Exception(f"Cannot connect to Ollama at {ollama_url}. Make sure Ollama is running.")
+    except Exception as e:
+        logger.error(f"Ollama error: {e}")
+        raise
 
 def generate_with_huggingface(transcript, model_name):
     """Generate notes using Hugging Face Inference API."""
-    hf_token = os.environ.get('HF_TOKEN')
-    if not hf_token:
-        raise EnvironmentError("HF_TOKEN required for Hugging Face models")
-    
-    prompt = create_simple_prompt(transcript)
-    
-    response = requests.post(
-        f"https://api-inference.huggingface.co/models/{model_name}",
-        headers={"Authorization": f"Bearer {hf_token}"},
-        json={
-            "inputs": prompt,
-            "parameters": {
-                "temperature": float(os.environ.get('MODEL_TEMPERATURE', '0.7')),
-                "max_new_tokens": int(os.environ.get('MAX_TOKENS', '1024'))
-            }
-        }
-    )
-    
-    if response.status_code == 200:
-        result = response.json()
-        text = result[0].get('generated_text', '') if isinstance(result, list) else result.get('generated_text', '')
-        return parse_simple_response(text)
-    else:
-        raise Exception(f"Hugging Face API error: {response.status_code}")
+    try:
+        hf_token = os.environ.get('HF_TOKEN')
+        if not hf_token:
+            raise EnvironmentError("HF_TOKEN required for Hugging Face models. Get free token from https://huggingface.co/")
+        
+        logger.info(f"Using Hugging Face model: {model_name}")
+        prompt = create_simple_prompt(transcript)
+        
+        response = requests.post(
+            f"https://api-inference.huggingface.co/models/{model_name}",
+            headers={"Authorization": f"Bearer {hf_token}"},
+            json={
+                "inputs": prompt,
+                "parameters": {
+                    "temperature": float(os.environ.get('MODEL_TEMPERATURE', '0.7')),
+                    "max_new_tokens": int(os.environ.get('MAX_TOKENS', '1024'))
+                }
+            },
+            timeout=120
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            text = result[0].get('generated_text', '') if isinstance(result, list) else result.get('generated_text', '')
+            return parse_simple_response(text)
+        else:
+            logger.error(f"Hugging Face API error: {response.status_code} - {response.text}")
+            raise Exception(f"Hugging Face API error: {response.status_code}. Check your HF_TOKEN and model availability.")
+    except Exception as e:
+        logger.error(f"Hugging Face error: {e}")
+        raise
 
 def generate_with_openai_compatible(transcript, model_name):
     """Generate notes using OpenAI-compatible free APIs."""
-    api_url = os.environ.get('OPENAI_COMPATIBLE_URL', 'https://api.together.xyz/v1')
-    api_key = os.environ.get('OPENAI_COMPATIBLE_KEY')
-    
-    if not api_key:
-        raise EnvironmentError("OPENAI_COMPATIBLE_KEY required")
-    
-    prompt = create_simple_prompt(transcript)
-    
-    response = requests.post(f"{api_url}/chat/completions", 
-        headers={"Authorization": f"Bearer {api_key}"},
-        json={
-            "model": model_name,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": float(os.environ.get('MODEL_TEMPERATURE', '0.7')),
-            "max_tokens": int(os.environ.get('MAX_TOKENS', '4096'))
-        }
-    )
-    
-    if response.status_code == 200:
-        result = response.json()
-        text = result['choices'][0]['message']['content']
-        return parse_simple_response(text)
-    else:
-        raise Exception(f"OpenAI-compatible API error: {response.status_code}")
+    try:
+        api_url = os.environ.get('OPENAI_COMPATIBLE_URL', 'https://api.together.xyz/v1')
+        api_key = os.environ.get('OPENAI_COMPATIBLE_KEY')
+        
+        if not api_key:
+            raise EnvironmentError("OPENAI_COMPATIBLE_KEY required. Get free API key from Together AI, Anyscale, etc.")
+        
+        logger.info(f"Using OpenAI-compatible API: {api_url} with model {model_name}")
+        prompt = create_simple_prompt(transcript)
+        
+        response = requests.post(f"{api_url}/chat/completions", 
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={
+                "model": model_name,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": float(os.environ.get('MODEL_TEMPERATURE', '0.7')),
+                "max_tokens": int(os.environ.get('MAX_TOKENS', '4096'))
+            },
+            timeout=120
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            text = result['choices'][0]['message']['content']
+            return parse_simple_response(text)
+        else:
+            logger.error(f"OpenAI-compatible API error: {response.status_code} - {response.text}")
+            raise Exception(f"OpenAI-compatible API error: {response.status_code}. Check your API key and model availability.")
+    except Exception as e:
+        logger.error(f"OpenAI-compatible API error: {e}")
+        raise
 
 def create_simple_prompt(transcript):
     """Create a simplified prompt for free models."""
