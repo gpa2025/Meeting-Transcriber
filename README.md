@@ -31,10 +31,11 @@ A tool for transcribing meeting audio and generating detailed meeting notes usin
 - **For AWS Models:**
   - AWS Account with access to AWS Transcribe, S3, and Bedrock
   - AWS credentials with appropriate permissions
-- **For Free Models (Optional):**
-  - Ollama (for local models)
-  - Hugging Face account (for HF models)
-  - Free API keys from providers like Together AI
+- **For Free Models (No AWS Required):**
+  - Ollama (for local models) - completely free and private
+  - Hugging Face account (for HF models) - free tier available
+  - Free API keys from providers like Together AI - free tier available
+  - **No AWS account, credentials, or costs needed**
 
 ## Installation
 
@@ -52,12 +53,13 @@ A tool for transcribing meeting audio and generating detailed meeting notes usin
 
 ### Quick Start with Free Models
 
-To use without AWS costs:
+To use without AWS costs or credentials:
 
 1. **Install Ollama:** Download from https://ollama.ai/
 2. **Pull a model:** `ollama pull llama3.2`
 3. **Run the app** and select "ollama:llama3.2" from the model dropdown
-4. **No AWS credentials needed** for local processing
+4. **Select local storage directory** (no AWS setup required)
+5. **Start transcribing** - completely free and private
 
 ### From Source
 

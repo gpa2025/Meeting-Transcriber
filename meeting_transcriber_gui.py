@@ -54,10 +54,20 @@ class TranscriptionWorker(QThread):
     def run(self):
         try:
             # Set environment variables for AWS credentials - strip any whitespace
-            os.environ["AWS_ACCESS_KEY_ID"] = self.aws_credentials["access_key"].strip()
-            os.environ["AWS_SECRET_ACCESS_KEY"] = self.aws_credentials["secret_key"].strip()
-            os.environ["AWS_REGION"] = self.aws_credentials["region"].strip()
-            os.environ["AWS_S3_BUCKET"] = self.aws_credentials["s3_bucket"].strip()
+            model_id = self.aws_settings["model_id"]
+            is_free_model = model_id.startswith(('ollama:', 'hf:', 'openai-free:'))
+            
+            if is_free_model:
+                # Set dummy credentials for free models to avoid import errors
+                os.environ["AWS_ACCESS_KEY_ID"] = "dummy"
+                os.environ["AWS_SECRET_ACCESS_KEY"] = "dummy"
+                os.environ["AWS_REGION"] = "us-east-1"
+                os.environ["AWS_S3_BUCKET"] = "dummy"
+            else:
+                os.environ["AWS_ACCESS_KEY_ID"] = self.aws_credentials["access_key"].strip()
+                os.environ["AWS_SECRET_ACCESS_KEY"] = self.aws_credentials["secret_key"].strip()
+                os.environ["AWS_REGION"] = self.aws_credentials["region"].strip()
+                os.environ["AWS_S3_BUCKET"] = self.aws_credentials["s3_bucket"].strip()
             os.environ["BEDROCK_MODEL_ID"] = self.aws_settings["model_id"]
             os.environ["MODEL_TEMPERATURE"] = self.aws_settings["temperature"]
             os.environ["MAX_TOKENS"] = self.aws_settings["max_tokens"]
@@ -553,9 +563,10 @@ class MeetingTranscriberGUI(QMainWindow):
             QMessageBox.warning(self, "Missing Input", "Please select an output directory.")
             return
         
-        if not self.access_key_input.text() or not self.secret_key_input.text():
-            QMessageBox.warning(self, "Missing Credentials", "Please enter AWS access key and secret key.")
-            return
+        if not is_free_model:
+            if not self.access_key_input.text() or not self.secret_key_input.text():
+                QMessageBox.warning(self, "Missing Credentials", "Please enter AWS access key and secret key for AWS models.")
+                return
         
         # Check model type for validation
         model_id = self.model_input.currentText()
