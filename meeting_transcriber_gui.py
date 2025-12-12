@@ -44,12 +44,14 @@ class TranscriptionWorker(QThread):
     progress_update = pyqtSignal(str)
     finished_signal = pyqtSignal(bool, str)
     
-    def __init__(self, audio_file, output_dir, aws_credentials, aws_settings):
+    def __init__(self, audio_file, output_dir, aws_credentials, aws_settings, skip_transcription=False, transcript_file=None):
         super().__init__()
         self.audio_file = audio_file
         self.output_dir = output_dir
         self.aws_credentials = aws_credentials
         self.aws_settings = aws_settings
+        self.skip_transcription = skip_transcription
+        self.transcript_file = transcript_file
         
     def run(self):
         try:
@@ -77,6 +79,7 @@ class TranscriptionWorker(QThread):
             os.environ["MAX_SPEAKER_LABELS"] = self.aws_settings["max_speakers"]
             os.environ["LOCAL_STORAGE_DIR"] = self.aws_settings["local_storage_dir"]
             os.environ["TRANSCRIPTION_METHOD"] = self.aws_settings["transcription_method"]
+            os.environ["OPENAI_COMPATIBLE_KEY"] = self.aws_settings.get("openai_compatible_key", "")
             
             # Create output directory if it doesn't exist
             os.makedirs(self.output_dir, exist_ok=True)
@@ -101,44 +104,54 @@ class TranscriptionWorker(QThread):
                 meeting_date = datetime.now()
                 self.progress_update.emit(f"Warning: Could not get file date, using current date: {e}")
             
-            # Step 1: Transcribe audio
-            transcription_method = os.environ.get('TRANSCRIPTION_METHOD', 'AWS Transcribe (Premium)')
-            
-            if "Local" in transcription_method:
-                self.progress_update.emit("Transcribing audio file locally... (this may take a while)")
-                # Import local transcription function
-                from transcriber import transcribe_audio
-                transcript = transcribe_audio(self.audio_file, method="local")
+            # Step 1: Transcribe audio or load existing transcript
+            if self.skip_transcription:
+                self.progress_update.emit("Skipping transcription - loading selected transcript file...")
+                
+                if self.transcript_file and os.path.exists(self.transcript_file):
+                    with open(self.transcript_file, 'r', encoding='utf-8') as f:
+                        text_for_summary = f.read()
+                    self.progress_update.emit(f"Loaded transcript from: {self.transcript_file}")
+                else:
+                    raise Exception(f"Selected transcript file not found: {self.transcript_file}. Please select a valid transcript file.")
             else:
-                self.progress_update.emit("Transcribing audio file with AWS... (this may take a while)")
-                transcript = aws_transcribe.transcribe_with_aws(self.audio_file)
-            
-            # Save transcript to file
-            if isinstance(transcript, dict) and 'speaker_segments' in transcript:
-                # Handle speaker diarization format
-                transcript_file = os.path.join(self.output_dir, f"{base_filename}_transcript.txt")
-                speaker_transcript_file = os.path.join(self.output_dir, f"{base_filename}_transcript_with_speakers.txt")
+                transcription_method = os.environ.get('TRANSCRIPTION_METHOD', 'AWS Transcribe (Premium)')
                 
-                # Save plain transcript
-                self.save_to_file(transcript['full_transcript'], transcript_file)
+                if "Local" in transcription_method:
+                    self.progress_update.emit("Transcribing audio file locally... (this may take a while)")
+                    # Import local transcription function
+                    from transcriber import transcribe_audio
+                    transcript = transcribe_audio(self.audio_file, method="local")
+                else:
+                    self.progress_update.emit("Transcribing audio file with AWS... (this may take a while)")
+                    transcript = aws_transcribe.transcribe_with_aws(self.audio_file)
                 
-                # Save transcript with speaker labels
-                speaker_text = ""
-                for segment in transcript['speaker_segments']:
-                    speaker_text += f"{segment['speaker']}: {segment['text']}\n\n"
-                self.save_to_file(speaker_text, speaker_transcript_file)
-                
-                self.progress_update.emit(f"Transcript saved to {transcript_file}")
-                self.progress_update.emit(f"Transcript with speakers saved to {speaker_transcript_file}")
-                
-                # Use the full transcript for summarization
-                text_for_summary = transcript['full_transcript']
-            else:
-                # Handle plain text transcript
-                transcript_file = os.path.join(self.output_dir, f"{base_filename}_transcript.txt")
-                self.save_to_file(transcript, transcript_file)
-                self.progress_update.emit(f"Transcript saved to {transcript_file}")
-                text_for_summary = transcript
+                # Save transcript to file
+                if isinstance(transcript, dict) and 'speaker_segments' in transcript:
+                    # Handle speaker diarization format
+                    transcript_file = os.path.join(self.output_dir, f"{base_filename}_transcript.txt")
+                    speaker_transcript_file = os.path.join(self.output_dir, f"{base_filename}_transcript_with_speakers.txt")
+                    
+                    # Save plain transcript
+                    self.save_to_file(transcript['full_transcript'], transcript_file)
+                    
+                    # Save transcript with speaker labels
+                    speaker_text = ""
+                    for segment in transcript['speaker_segments']:
+                        speaker_text += f"{segment['speaker']}: {segment['text']}\n\n"
+                    self.save_to_file(speaker_text, speaker_transcript_file)
+                    
+                    self.progress_update.emit(f"Transcript saved to {transcript_file}")
+                    self.progress_update.emit(f"Transcript with speakers saved to {speaker_transcript_file}")
+                    
+                    # Use the full transcript for summarization
+                    text_for_summary = transcript['full_transcript']
+                else:
+                    # Handle plain text transcript
+                    transcript_file = os.path.join(self.output_dir, f"{base_filename}_transcript.txt")
+                    self.save_to_file(transcript, transcript_file)
+                    self.progress_update.emit(f"Transcript saved to {transcript_file}")
+                    text_for_summary = transcript
             
             # Step 2: Generate meeting notes
             model_id = os.environ.get('BEDROCK_MODEL_ID', 'anthropic.claude-3-5-sonnet-20241022-v2:0')
@@ -155,7 +168,7 @@ class TranscriptionWorker(QThread):
             
             # Extract participants if available
             participants = []
-            if isinstance(transcript, dict) and 'speaker_segments' in transcript:
+            if not self.skip_transcription and isinstance(transcript, dict) and 'speaker_segments' in transcript:
                 # Extract unique speakers
                 speakers = set()
                 for segment in transcript['speaker_segments']:
@@ -175,7 +188,7 @@ class TranscriptionWorker(QThread):
                 key_points=key_points,
                 action_items=action_items,
                 participants=participants,
-                has_speaker_segments=isinstance(transcript, dict) and 'speaker_segments' in transcript,
+                has_speaker_segments=not self.skip_transcription and isinstance(transcript, dict) and 'speaker_segments' in transcript,
                 meeting_date=meeting_date  # Use the file date instead of current date
             )
             
@@ -194,7 +207,10 @@ class TranscriptionWorker(QThread):
             else:
                 subprocess.Popen(['xdg-open', self.output_dir])
             
-            self.finished_signal.emit(True, "Transcription and summarization completed successfully!\nOutput directory opened.")
+            if self.skip_transcription:
+                self.finished_signal.emit(True, "Summarization completed successfully!\nOutput directory opened.")
+            else:
+                self.finished_signal.emit(True, "Transcription and summarization completed successfully!\nOutput directory opened.")
                 
         except Exception as e:
             logger.error(f"Error in transcription worker: {e}")
@@ -317,11 +333,17 @@ class MeetingTranscriberGUI(QMainWindow):
         self.system_prompt_input.setPlaceholderText("Enter system prompt here...")
         self.system_prompt_input.setMaximumHeight(100)
         
+        # Free model API keys
+        self.openai_compatible_key_input = QLineEdit()
+        self.openai_compatible_key_input.setEchoMode(QLineEdit.Password)
+        self.openai_compatible_key_input.setPlaceholderText("For OpenAI-compatible free APIs (Together AI, etc.)")
+        
         bedrock_layout.addRow("Transcription:", self.transcription_input)
         bedrock_layout.addRow("AI Model:", self.model_input)
         bedrock_layout.addRow("Temperature:", self.temperature_input)
         bedrock_layout.addRow("Max Tokens:", self.max_tokens_input)
         bedrock_layout.addRow("System Prompt:", self.system_prompt_input)
+        bedrock_layout.addRow("OpenAI-Compatible Key:", self.openai_compatible_key_input)
         bedrock_group.setLayout(bedrock_layout)
         
         # Transcription Settings Group
@@ -359,8 +381,31 @@ class MeetingTranscriberGUI(QMainWindow):
         output_dir_layout.addWidget(self.output_dir_input)
         output_dir_layout.addWidget(output_dir_button)
         
+        # Skip transcription checkbox
+        self.skip_transcription_checkbox = QComboBox()
+        self.skip_transcription_checkbox.addItems(["No - Transcribe audio", "Yes - Skip to summarization only"])
+        self.skip_transcription_checkbox.currentTextChanged.connect(self.on_skip_transcription_changed)
+        
+        # Transcript file selection (initially hidden)
+        self.transcript_file_input = QLineEdit()
+        self.transcript_file_input.setReadOnly(True)
+        transcript_file_button = QPushButton("Browse...")
+        transcript_file_button.clicked.connect(self.browse_transcript_file)
+        transcript_file_layout = QHBoxLayout()
+        transcript_file_layout.addWidget(self.transcript_file_input)
+        transcript_file_layout.addWidget(transcript_file_button)
+        
         file_layout.addRow("Audio File:", audio_file_layout)
         file_layout.addRow("Output Directory:", output_dir_layout)
+        file_layout.addRow("Skip Transcription:", self.skip_transcription_checkbox)
+        file_layout.addRow("Transcript File:", transcript_file_layout)
+        
+        # Store references for show/hide functionality
+        self.transcript_file_row_widgets = [self.transcript_file_input, transcript_file_button]
+        
+        # Initially hide transcript file selection
+        for widget in self.transcript_file_row_widgets:
+            widget.hide()
         file_group.setLayout(file_layout)
         
         # Progress and Log Group
@@ -438,6 +483,24 @@ class MeetingTranscriberGUI(QMainWindow):
         if dir_path:
             self.local_storage_input.setText(dir_path)
     
+    def browse_transcript_file(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select Transcript File", "", 
+            "Text Files (*.txt);;All Files (*)"
+        )
+        if file_path:
+            self.transcript_file_input.setText(file_path)
+    
+    def on_skip_transcription_changed(self):
+        skip_transcription = self.skip_transcription_checkbox.currentText().startswith("Yes")
+        
+        # Show/hide transcript file selection based on skip transcription option
+        for widget in self.transcript_file_row_widgets:
+            if skip_transcription:
+                widget.show()
+            else:
+                widget.hide()
+    
     def get_config_path(self):
         """Get the path to the config file, handling both script and executable modes"""
         if getattr(sys, 'frozen', False):
@@ -486,6 +549,12 @@ class MeetingTranscriberGUI(QMainWindow):
                 # Load file paths
                 self.output_dir_input.setText(config.get("output_dir", ""))
                 self.local_storage_input.setText(config.get("local_storage_dir", ""))
+                self.skip_transcription_checkbox.setCurrentText(config.get("skip_transcription", "No - Transcribe audio"))
+                self.transcript_file_input.setText(config.get("transcript_file", ""))
+                self.openai_compatible_key_input.setText(config.get("openai_compatible_key", ""))
+                
+                # Update UI visibility based on loaded skip transcription setting
+                self.on_skip_transcription_changed()
                 
                 logger.info("Settings loaded successfully")
             except Exception as e:
@@ -547,7 +616,10 @@ class MeetingTranscriberGUI(QMainWindow):
             "enable_diarization": self.diarization_input.currentText() == "Enabled",
             "max_speakers": self.max_speakers_input.text(),
             "output_dir": self.output_dir_input.text(),
-            "local_storage_dir": self.local_storage_input.text()
+            "local_storage_dir": self.local_storage_input.text(),
+            "skip_transcription": self.skip_transcription_checkbox.currentText(),
+            "transcript_file": self.transcript_file_input.text(),
+            "openai_compatible_key": self.openai_compatible_key_input.text()
         }
         
         config_path = self.get_config_path()
@@ -582,9 +654,16 @@ class MeetingTranscriberGUI(QMainWindow):
     
     def start_transcription(self):
         """Start the transcription process"""
+        # Check if transcription should be skipped
+        skip_transcription = self.skip_transcription_checkbox.currentText().startswith("Yes")
+        
         # Validate inputs
-        if not self.audio_file_input.text():
-            QMessageBox.warning(self, "Missing Input", "Please select an audio file.")
+        if not skip_transcription and not self.audio_file_input.text():
+            QMessageBox.warning(self, "Missing Input", "Please select an audio file (or enable 'Skip Transcription').")
+            return
+        
+        if skip_transcription and not self.transcript_file_input.text():
+            QMessageBox.warning(self, "Missing Input", "Please select a transcript file when skipping transcription.")
             return
         
         if not self.output_dir_input.text():
@@ -629,7 +708,8 @@ class MeetingTranscriberGUI(QMainWindow):
             "enable_diarization": self.diarization_input.currentText() == "Enabled",
             "max_speakers": self.max_speakers_input.text(),
             "local_storage_dir": self.local_storage_input.text(),
-            "transcription_method": self.transcription_input.currentText()
+            "transcription_method": self.transcription_input.currentText(),
+            "openai_compatible_key": self.openai_compatible_key_input.text()
         }
         
         # Clear log output
@@ -641,12 +721,17 @@ class MeetingTranscriberGUI(QMainWindow):
         # Disable start button
         self.start_button.setEnabled(False)
         
+        # Check if transcription should be skipped
+        skip_transcription = self.skip_transcription_checkbox.currentText().startswith("Yes")
+        
         # Create and start worker thread
         self.worker = TranscriptionWorker(
             self.audio_file_input.text(),
             self.output_dir_input.text(),
             aws_credentials,
-            aws_settings
+            aws_settings,
+            skip_transcription,
+            self.transcript_file_input.text() if skip_transcription else None
         )
         self.worker.progress_update.connect(self.update_log)
         self.worker.finished_signal.connect(self.transcription_finished)
