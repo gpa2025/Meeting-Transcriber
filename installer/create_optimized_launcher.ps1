@@ -23,10 +23,15 @@ $pythonFiles = @(
     "aws_transcribe.py",
     "format_meeting_notes.py",
     "summarizer_bedrock.py",
+    "summarizer_free.py",
     "utils.py",
     "requirements.txt",
+    "requirements_free.txt",
     ".env.example",
-    "icon.ico"
+    "icon.ico",
+    "FREE_MODELS_SETUP.md",
+    "MODEL_UPDATE_NOTES.md",
+    "CHANGELOG.md"
 )
 
 foreach ($file in $pythonFiles) {

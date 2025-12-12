@@ -65,6 +65,7 @@ class TranscriptionWorker(QThread):
             os.environ["TRANSCRIBE_LANGUAGE_CODE"] = self.aws_settings["language_code"]
             os.environ["ENABLE_SPEAKER_DIARIZATION"] = "true" if self.aws_settings["enable_diarization"] else "false"
             os.environ["MAX_SPEAKER_LABELS"] = self.aws_settings["max_speakers"]
+            os.environ["LOCAL_STORAGE_DIR"] = self.aws_settings["local_storage_dir"]
             
             # Create output directory if it doesn't exist
             os.makedirs(self.output_dir, exist_ok=True)
@@ -196,7 +197,7 @@ class MeetingTranscriberGUI(QMainWindow):
         main_layout = QVBoxLayout()
         
         # AWS Credentials Group
-        aws_group = QGroupBox("AWS Credentials")
+        aws_group = QGroupBox("AWS Credentials (for AWS models only)")
         aws_layout = QFormLayout()
         
         self.access_key_input = QLineEdit()
@@ -215,6 +216,21 @@ class MeetingTranscriberGUI(QMainWindow):
         aws_layout.addRow("Region:", self.region_input)
         aws_layout.addRow("S3 Bucket:", self.s3_bucket_input)
         aws_group.setLayout(aws_layout)
+        
+        # Local Storage Group for non-AWS models
+        local_group = QGroupBox("Local Storage (for free models)")
+        local_layout = QFormLayout()
+        
+        self.local_storage_input = QLineEdit()
+        self.local_storage_input.setReadOnly(True)
+        local_storage_button = QPushButton("Browse...")
+        local_storage_button.clicked.connect(self.browse_local_storage)
+        local_storage_layout = QHBoxLayout()
+        local_storage_layout.addWidget(self.local_storage_input)
+        local_storage_layout.addWidget(local_storage_button)
+        
+        local_layout.addRow("Data Folder:", local_storage_layout)
+        local_group.setLayout(local_layout)
         
         # Bedrock Settings Group
         bedrock_group = QGroupBox("Bedrock Settings")
@@ -339,6 +355,7 @@ class MeetingTranscriberGUI(QMainWindow):
         
         # Add all groups to main layout
         main_layout.addWidget(aws_group)
+        main_layout.addWidget(local_group)
         main_layout.addWidget(bedrock_group)
         main_layout.addWidget(transcription_group)
         main_layout.addWidget(file_group)
@@ -377,6 +394,11 @@ class MeetingTranscriberGUI(QMainWindow):
         dir_path = QFileDialog.getExistingDirectory(self, "Select Output Directory")
         if dir_path:
             self.output_dir_input.setText(dir_path)
+    
+    def browse_local_storage(self):
+        dir_path = QFileDialog.getExistingDirectory(self, "Select Local Storage Directory")
+        if dir_path:
+            self.local_storage_input.setText(dir_path)
     
     def get_config_path(self):
         """Get the path to the config file, handling both script and executable modes"""
@@ -425,6 +447,7 @@ class MeetingTranscriberGUI(QMainWindow):
                 
                 # Load file paths
                 self.output_dir_input.setText(config.get("output_dir", ""))
+                self.local_storage_input.setText(config.get("local_storage_dir", ""))
                 
                 logger.info("Settings loaded successfully")
             except Exception as e:
@@ -485,7 +508,8 @@ class MeetingTranscriberGUI(QMainWindow):
             "language_code": self.language_input.currentText(),
             "enable_diarization": self.diarization_input.currentText() == "Enabled",
             "max_speakers": self.max_speakers_input.text(),
-            "output_dir": self.output_dir_input.text()
+            "output_dir": self.output_dir_input.text(),
+            "local_storage_dir": self.local_storage_input.text()
         }
         
         config_path = self.get_config_path()
@@ -533,9 +557,18 @@ class MeetingTranscriberGUI(QMainWindow):
             QMessageBox.warning(self, "Missing Credentials", "Please enter AWS access key and secret key.")
             return
         
-        if not self.s3_bucket_input.text():
-            QMessageBox.warning(self, "Missing Input", "Please enter an S3 bucket name.")
-            return
+        # Check model type for validation
+        model_id = self.model_input.currentText()
+        is_free_model = model_id.startswith(('ollama:', 'hf:', 'openai-free:'))
+        
+        if is_free_model:
+            if not self.local_storage_input.text():
+                QMessageBox.warning(self, "Missing Input", "Please select a local storage directory for free models.")
+                return
+        else:
+            if not self.s3_bucket_input.text():
+                QMessageBox.warning(self, "Missing Input", "Please enter an S3 bucket name for AWS models.")
+                return
         
         # Collect AWS credentials
         aws_credentials = {
@@ -553,7 +586,8 @@ class MeetingTranscriberGUI(QMainWindow):
             "system_prompt": self.system_prompt_input.toPlainText(),
             "language_code": self.language_input.currentText(),
             "enable_diarization": self.diarization_input.currentText() == "Enabled",
-            "max_speakers": self.max_speakers_input.text()
+            "max_speakers": self.max_speakers_input.text(),
+            "local_storage_dir": self.local_storage_input.text()
         }
         
         # Clear log output

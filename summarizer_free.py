@@ -28,6 +28,12 @@ def generate_notes_with_free_models(transcript):
     Returns:
         tuple: (summary, key_points, action_items)
     """
+    # Ensure local storage directory exists
+    local_storage_dir = os.environ.get('LOCAL_STORAGE_DIR', '')
+    if local_storage_dir and not os.path.exists(local_storage_dir):
+        os.makedirs(local_storage_dir, exist_ok=True)
+        logger.info(f"Created local storage directory: {local_storage_dir}")
+    
     model_id = os.environ.get('FREE_MODEL_ID', 'ollama:llama3.2')
     
     if model_id.startswith('ollama:'):
