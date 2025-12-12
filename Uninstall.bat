@@ -68,9 +68,41 @@ REM Remove Start Menu shortcut using PowerShell
 powershell -Command "Get-ChildItem -Path (Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'Microsoft\Windows\Start Menu\Programs') -Filter 'Meeting Transcriber.lnk' -ErrorAction SilentlyContinue | Remove-Item -Force"
 powershell -Command "Get-ChildItem -Path (Join-Path ([Environment]::GetFolderPath('CommonPrograms')) '') -Filter 'Meeting Transcriber.lnk' -ErrorAction SilentlyContinue | Remove-Item -Force"
 
-REM ===== REMOVE CONFIGURATION FILES =====
-echo Removing configuration files...
+REM ===== HANDLE CONFIGURATION FILES =====
 if exist "%APPDATA%\MeetingTranscriber\gui_config.json" (
+    set /p save_config="Do you want to save your settings before uninstalling? (y/n): "
+    if /i "!save_config!"=="y" (
+        echo.
+        echo Choose where to save your settings:
+        echo 1. Desktop
+        echo 2. Documents folder
+        echo 3. Current directory
+        echo 4. Custom location
+        echo.
+        set /p save_location="Enter your choice (1-4): "
+        
+        if "!save_location!"=="1" (
+            set "backup_path=%USERPROFILE%\Desktop\MeetingTranscriber_Settings_Backup.json"
+        ) else if "!save_location!"=="2" (
+            set "backup_path=%USERPROFILE%\Documents\MeetingTranscriber_Settings_Backup.json"
+        ) else if "!save_location!"=="3" (
+            set "backup_path=%~dp0MeetingTranscriber_Settings_Backup.json"
+        ) else if "!save_location!"=="4" (
+            set /p "backup_path=Enter full path for backup file: "
+        ) else (
+            echo Invalid choice. Saving to Desktop.
+            set "backup_path=%USERPROFILE%\Desktop\MeetingTranscriber_Settings_Backup.json"
+        )
+        
+        copy "%APPDATA%\MeetingTranscriber\gui_config.json" "!backup_path!" >nul 2>&1
+        if !errorlevel! equ 0 (
+            echo Settings backed up to: !backup_path!
+        ) else (
+            echo Failed to backup settings to: !backup_path!
+        )
+    )
+    
+    echo Removing configuration files...
     del "%APPDATA%\MeetingTranscriber\gui_config.json" 2>nul
     if !errorlevel! equ 0 (
         echo Configuration file removed.

@@ -288,45 +288,17 @@ class MeetingTranscriberGUI(QMainWindow):
             "Local SpeechRecognition (Free)"
         ])
         
-        # AI Model for Summarization
+        # AI Model for Summarization with manage button
+        model_layout = QHBoxLayout()
         self.model_input = QComboBox()
-        self.model_input.addItems([
-            # AWS Bedrock Models
-            "anthropic.claude-3-5-sonnet-20241022-v2:0",
-            "anthropic.claude-3-5-sonnet-20240620-v1:0",
-            "anthropic.claude-3-5-haiku-20241022-v1:0",
-            "anthropic.claude-3-opus-20240229-v1:0",
-            "anthropic.claude-3-sonnet-20240229-v1:0",
-            "anthropic.claude-3-haiku-20240307-v1:0",
-            "amazon.nova-pro-v1:0",
-            "amazon.nova-lite-v1:0",
-            "amazon.nova-micro-v1:0",
-            "amazon.titan-text-premier-v1:0",
-            "amazon.titan-text-express-v1",
-            "meta.llama3-2-90b-instruct-v1:0",
-            "meta.llama3-2-11b-instruct-v1:0",
-            "meta.llama3-2-3b-instruct-v1:0",
-            "meta.llama3-2-1b-instruct-v1:0",
-            "meta.llama3-1-405b-instruct-v1:0",
-            "meta.llama3-1-70b-instruct-v1:0",
-            "meta.llama3-1-8b-instruct-v1:0",
-            "mistral.mistral-large-2407-v1:0",
-            "mistral.mistral-small-2402-v1:0",
-            # Free Models (Ollama)
-            "ollama:llama3.2",
-            "ollama:llama3.1",
-            "ollama:mistral",
-            "ollama:codellama",
-            "ollama:phi3",
-            # Free Models (Hugging Face)
-            "hf:microsoft/DialoGPT-large",
-            "hf:microsoft/DialoGPT-medium",
-            "hf:google/flan-t5-large",
-            # Free Models (OpenAI-compatible APIs)
-            "openai-free:meta-llama/Llama-2-7b-chat-hf",
-            "openai-free:mistralai/Mistral-7B-Instruct-v0.1",
-            "openai-free:NousResearch/Nous-Hermes-2-Yi-34B"
-        ])
+        self.model_input.setEditable(True)
+        self.load_model_list()
+        
+        manage_models_button = QPushButton("Manage Models")
+        manage_models_button.clicked.connect(self.manage_models)
+        
+        model_layout.addWidget(self.model_input)
+        model_layout.addWidget(manage_models_button)
         self.temperature_input = QLineEdit("0.7")
         self.max_tokens_input = QLineEdit("4096")
         self.system_prompt_input = QTextEdit()
@@ -339,7 +311,7 @@ class MeetingTranscriberGUI(QMainWindow):
         self.openai_compatible_key_input.setPlaceholderText("For OpenAI-compatible free APIs (Together AI, etc.)")
         
         bedrock_layout.addRow("Transcription:", self.transcription_input)
-        bedrock_layout.addRow("AI Model:", self.model_input)
+        bedrock_layout.addRow("AI Model:", model_layout)
         bedrock_layout.addRow("Temperature:", self.temperature_input)
         bedrock_layout.addRow("Max Tokens:", self.max_tokens_input)
         bedrock_layout.addRow("System Prompt:", self.system_prompt_input)
@@ -500,6 +472,261 @@ class MeetingTranscriberGUI(QMainWindow):
                 widget.show()
             else:
                 widget.hide()
+    
+    def get_default_models(self):
+        """Get the default list of AI models"""
+        return [
+            # AWS Bedrock Models (using inference profiles)
+            "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+            "us.anthropic.claude-3-5-haiku-20241022-v1:0",
+            "us.anthropic.claude-3-opus-20240229-v1:0",
+            "us.anthropic.claude-3-sonnet-20240229-v1:0",
+            "us.anthropic.claude-3-haiku-20240307-v1:0",
+            "amazon.nova-pro-v1:0",
+            "amazon.nova-lite-v1:0",
+            "amazon.nova-micro-v1:0",
+            "amazon.titan-text-premier-v1:0",
+            "meta.llama3-2-90b-instruct-v1:0",
+            "meta.llama3-2-11b-instruct-v1:0",
+            "meta.llama3-2-3b-instruct-v1:0",
+            "meta.llama3-2-1b-instruct-v1:0",
+            "meta.llama3-1-405b-instruct-v1:0",
+            "meta.llama3-1-70b-instruct-v1:0",
+            "meta.llama3-1-8b-instruct-v1:0",
+            "mistral.mistral-large-2407-v1:0",
+            "mistral.mistral-small-2402-v1:0",
+            # Free Models (Ollama)
+            "ollama:llama3.2",
+            "ollama:llama3.1",
+            "ollama:mistral",
+            "ollama:codellama",
+            "ollama:phi3",
+            # Free Models (Hugging Face)
+            "hf:microsoft/DialoGPT-large",
+            "hf:microsoft/DialoGPT-medium",
+            "hf:google/flan-t5-large",
+            # Free Models (OpenAI-compatible APIs)
+            "openai-free:meta-llama/Llama-2-7b-chat-hf",
+            "openai-free:mistralai/Mistral-7B-Instruct-v0.1",
+            "openai-free:NousResearch/Nous-Hermes-2-Yi-34B"
+        ]
+    
+    def get_deprecated_models(self):
+        """Get list of deprecated/end-of-life models to remove"""
+        return [
+            # Deprecated AWS Bedrock models
+            "us.anthropic.claude-3-5-sonnet-20240620-v1:0",
+            "anthropic.claude-3-5-sonnet-20240620-v1:0",
+            "amazon.titan-text-express-v1",
+            "anthropic.claude-v2",
+            "anthropic.claude-instant-v1",
+            # Add more deprecated models as they become end-of-life
+        ]
+    
+    def clean_deprecated_models(self, models):
+        """Remove deprecated models from the list"""
+        deprecated = self.get_deprecated_models()
+        cleaned_models = [model for model in models if model not in deprecated]
+        
+        removed_count = len(models) - len(cleaned_models)
+        if removed_count > 0:
+            logger.info(f"Removed {removed_count} deprecated models from list")
+        
+        return cleaned_models
+    
+    def load_model_list(self):
+        """Load model list from config or use defaults"""
+        config_path = self.get_config_path()
+        models = self.get_default_models()
+        
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r') as f:
+                    config = json.load(f)
+                    models = config.get("custom_models", models)
+            except Exception as e:
+                logger.error(f"Error loading custom models: {e}")
+        
+        # Clean deprecated models
+        models = self.clean_deprecated_models(models)
+        
+        self.model_input.clear()
+        self.model_input.addItems(models)
+    
+    def save_model_list(self, models):
+        """Save custom model list to config"""
+        config_path = self.get_config_path()
+        config = {}
+        
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r') as f:
+                    config = json.load(f)
+            except Exception:
+                pass
+        
+        config["custom_models"] = models
+        
+        try:
+            os.makedirs(os.path.dirname(config_path), exist_ok=True)
+            with open(config_path, 'w') as f:
+                json.dump(config, f, indent=4)
+        except Exception as e:
+            logger.error(f"Error saving custom models: {e}")
+    
+    def manage_models(self):
+        """Open model management dialog"""
+        from PyQt5.QtWidgets import QDialog, QListWidget, QVBoxLayout, QPushButton, QHBoxLayout, QInputDialog
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Manage AI Models")
+        dialog.setModal(True)
+        dialog.resize(500, 400)
+        
+        layout = QVBoxLayout()
+        
+        # Model list
+        model_list = QListWidget()
+        current_models = [self.model_input.itemText(i) for i in range(self.model_input.count())]
+        model_list.addItems(current_models)
+        layout.addWidget(model_list)
+        
+        # Buttons
+        button_layout = QHBoxLayout()
+        
+        add_button = QPushButton("Add Model")
+        add_button.clicked.connect(lambda: self.add_model(model_list))
+        
+        remove_button = QPushButton("Remove Selected")
+        remove_button.clicked.connect(lambda: self.remove_model(model_list))
+        
+        reset_button = QPushButton("Reset to Defaults")
+        reset_button.clicked.connect(lambda: self.reset_models(model_list))
+        
+        update_aws_button = QPushButton("Update AWS Models")
+        update_aws_button.clicked.connect(lambda: self.update_aws_models(model_list))
+        
+        save_button = QPushButton("Save")
+        save_button.clicked.connect(lambda: self.save_models(dialog, model_list))
+        
+        cancel_button = QPushButton("Cancel")
+        cancel_button.clicked.connect(dialog.reject)
+        
+        button_layout.addWidget(add_button)
+        button_layout.addWidget(remove_button)
+        button_layout.addWidget(reset_button)
+        button_layout.addWidget(update_aws_button)
+        button_layout.addStretch()
+        button_layout.addWidget(save_button)
+        button_layout.addWidget(cancel_button)
+        
+        layout.addLayout(button_layout)
+        dialog.setLayout(layout)
+        dialog.exec_()
+    
+    def add_model(self, model_list):
+        """Add a new model to the list"""
+        from PyQt5.QtWidgets import QInputDialog
+        
+        text, ok = QInputDialog.getText(self, 'Add Model', 'Enter model name:')
+        if ok and text.strip():
+            model_list.addItem(text.strip())
+    
+    def remove_model(self, model_list):
+        """Remove selected model from the list"""
+        current_row = model_list.currentRow()
+        if current_row >= 0:
+            model_list.takeItem(current_row)
+    
+    def reset_models(self, model_list):
+        """Reset model list to defaults"""
+        model_list.clear()
+        model_list.addItems(self.get_default_models())
+    
+    def update_aws_models(self, model_list):
+        """Fetch latest AWS Bedrock models and add to list"""
+        try:
+            import boto3
+            from PyQt5.QtWidgets import QMessageBox, QProgressDialog
+            from PyQt5.QtCore import Qt
+            
+            # Show progress dialog
+            progress = QProgressDialog("Fetching AWS Bedrock models...", "Cancel", 0, 0, self)
+            progress.setWindowModality(Qt.WindowModal)
+            progress.show()
+            
+            # Get AWS credentials from the form
+            access_key = self.access_key_input.text().strip()
+            secret_key = self.secret_key_input.text().strip()
+            region = self.region_input.currentText()
+            
+            if not access_key or not secret_key:
+                progress.close()
+                QMessageBox.warning(self, "Missing Credentials", "Please enter AWS credentials first.")
+                return
+            
+            # Create Bedrock client
+            bedrock = boto3.client(
+                'bedrock',
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
+                region_name=region
+            )
+            
+            # List foundation models
+            response = bedrock.list_foundation_models()
+            
+            # Extract model IDs for text generation
+            new_models = []
+            for model in response.get('modelSummaries', []):
+                model_id = model.get('modelId', '')
+                output_modalities = model.get('outputModalities', [])
+                
+                # Only include text generation models
+                if 'TEXT' in output_modalities and model_id:
+                    # Use inference profile format for supported models
+                    if model_id.startswith('anthropic.claude'):
+                        new_models.append(f"us.{model_id}")
+                    else:
+                        new_models.append(model_id)
+            
+            progress.close()
+            
+            if new_models:
+                # Get current models to avoid duplicates
+                current_models = [model_list.item(i).text() for i in range(model_list.count())]
+                
+                # Add new models that aren't already in the list
+                added_count = 0
+                for model in new_models:
+                    if model not in current_models:
+                        model_list.addItem(model)
+                        added_count += 1
+                
+                QMessageBox.information(self, "Success", f"Added {added_count} new AWS Bedrock models.")
+            else:
+                QMessageBox.information(self, "No New Models", "No new AWS Bedrock models found.")
+                
+        except ImportError:
+            QMessageBox.warning(self, "Missing Dependency", "boto3 is required to fetch AWS models. Please install it.")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to fetch AWS models: {str(e)}")
+    
+    def save_models(self, dialog, model_list):
+        """Save the model list and update the combo box"""
+        models = [model_list.item(i).text() for i in range(model_list.count())]
+        current_selection = self.model_input.currentText()
+        
+        self.save_model_list(models)
+        self.model_input.clear()
+        self.model_input.addItems(models)
+        
+        # Restore selection if it still exists
+        index = self.model_input.findText(current_selection)
+        if index >= 0:
+            self.model_input.setCurrentIndex(index)
+        
+        dialog.accept()
     
     def get_config_path(self):
         """Get the path to the config file, handling both script and executable modes"""
