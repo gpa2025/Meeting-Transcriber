@@ -6,8 +6,8 @@ This module provides a graphical user interface for the Meeting Transcriber appl
 Author: Gianpaolo Albanese
 E-Mail: albaneg@yahoo.com
 Work Email: gianpaoa@amazon.com
-Date: 05-09-2024
-Version: 1.0
+Date: 12-15-2025
+Version: 1.1
 Assisted by: Amazon Q for VS Code
 """
 
@@ -930,7 +930,7 @@ class MeetingTranscriberGUI(QMainWindow):
         about_text = """
         <h2>Meeting Transcriber</h2>
         <p><b>Version:</b> 1.1</p>
-        <p><b>Date:</b> 12-10-2025</p>
+        <p><b>Date:</b> 12-15-2025</p>
         <p><b>Author:</b> Gianpaolo Albanese</p>
         <p><b>E-Mail:</b> albaneg@yahoo.com</p>
         <p><b>Work Email:</b> gianpaoa@amazon.com</p>

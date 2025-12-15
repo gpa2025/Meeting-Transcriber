@@ -9,7 +9,7 @@ This module provides functions to:
 Author: Gianpaolo Albanese
 E-Mail: albaneg@yahoo.com
 Work Email: gianpaoa@amazon.com
-Date: 05-09-2024
+Date: 12-15-2025
 Version: 1.1
 Assisted by: Amazon Q for VS Code
 """

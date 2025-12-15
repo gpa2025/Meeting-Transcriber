@@ -69,7 +69,9 @@ powershell -Command "Get-ChildItem -Path (Join-Path ([Environment]::GetFolderPat
 powershell -Command "Get-ChildItem -Path (Join-Path ([Environment]::GetFolderPath('CommonPrograms')) '') -Filter 'Meeting Transcriber.lnk' -ErrorAction SilentlyContinue | Remove-Item -Force"
 
 REM ===== HANDLE CONFIGURATION FILES =====
+echo Checking for configuration files...
 if exist "%APPDATA%\MeetingTranscriber\gui_config.json" (
+    echo Configuration file found.
     set /p save_config="Do you want to save your settings before uninstalling? (y/n): "
     if /i "!save_config!"=="y" (
         echo Creating settings backup folder on Desktop...
@@ -77,7 +79,13 @@ if exist "%APPDATA%\MeetingTranscriber\gui_config.json" (
         
         REM Create backup folder
         if not exist "!backup_folder!" (
-            mkdir "!backup_folder!"
+            mkdir "!backup_folder!" 2>nul
+            if !errorlevel! equ 0 (
+                echo Backup folder created: !backup_folder!
+            ) else (
+                echo Failed to create backup folder
+                goto skip_backup
+            )
         )
         
         REM Copy gui_config.json
@@ -103,6 +111,8 @@ if exist "%APPDATA%\MeetingTranscriber\gui_config.json" (
         echo.
         echo Settings backup folder created at: !backup_folder!
         echo This folder contains your configuration files for future use.
+        
+        :skip_backup
     )
     
     echo Removing configuration files...
@@ -113,7 +123,7 @@ if exist "%APPDATA%\MeetingTranscriber\gui_config.json" (
         echo Failed to remove configuration file - permission denied.
     )
 ) else (
-    echo Configuration file not found.
+    echo No configuration file found.
 )
 
 REM Try to remove the config directory
@@ -182,35 +192,40 @@ REM ===== DEEP SEARCH FOR SHORTCUTS =====
 echo.
 echo Performing deep search for any remaining shortcuts...
 
-REM Use where command to find any remaining shortcuts in Desktop folders
-where /r "%USERPROFILE%\Desktop" "Meeting Transcriber.lnk" 2>nul > found_shortcuts.txt
-where /r "%PUBLIC%\Desktop" "Meeting Transcriber.lnk" 2>nul >> found_shortcuts.txt
+REM Create temporary file for found shortcuts
+echo. > found_shortcuts.txt
 
-REM Use where command to find any remaining shortcuts in Start Menu folders
-where /r "%APPDATA%\Microsoft\Windows\Start Menu" "Meeting Transcriber.lnk" 2>nul >> found_shortcuts.txt
-where /r "%ProgramData%\Microsoft\Windows\Start Menu" "Meeting Transcriber.lnk" 2>nul >> found_shortcuts.txt
+REM Use PowerShell to find shortcuts more reliably
+powershell -Command "Get-ChildItem -Path '%USERPROFILE%\Desktop' -Filter 'Meeting Transcriber.lnk' -Recurse -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }" >> found_shortcuts.txt 2>nul
+powershell -Command "Get-ChildItem -Path '%PUBLIC%\Desktop' -Filter 'Meeting Transcriber.lnk' -Recurse -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }" >> found_shortcuts.txt 2>nul
+powershell -Command "Get-ChildItem -Path '%APPDATA%\Microsoft\Windows\Start Menu' -Filter 'Meeting Transcriber.lnk' -Recurse -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }" >> found_shortcuts.txt 2>nul
+powershell -Command "Get-ChildItem -Path '%ProgramData%\Microsoft\Windows\Start Menu' -Filter 'Meeting Transcriber.lnk' -Recurse -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }" >> found_shortcuts.txt 2>nul
 
-REM Check if any shortcuts were found
+REM Check if any shortcuts were found and remove them
 set "shortcuts_exist=false"
-for /f "tokens=*" %%a in (found_shortcuts.txt) do (
-    echo Found remaining shortcut: %%a
-    del "%%a" 2>nul
-    if !errorlevel! equ 0 (
-        echo Successfully removed: %%a
-    ) else (
-        echo Failed to remove: %%a
-        set "shortcuts_exist=true"
+for /f "usebackq tokens=*" %%a in ("found_shortcuts.txt") do (
+    if not "%%a"=="" (
+        if exist "%%a" (
+            echo Found remaining shortcut: %%a
+            del "%%a" 2>nul
+            if !errorlevel! equ 0 (
+                echo Successfully removed: %%a
+            ) else (
+                echo Failed to remove: %%a
+                set "shortcuts_exist=true"
+            )
+        )
     )
 )
 
 REM Delete the temporary file
-del found_shortcuts.txt 2>nul
+if exist found_shortcuts.txt del found_shortcuts.txt 2>nul
 
-if "%shortcuts_exist%"=="true" (
+if "!shortcuts_exist!"=="true" (
     echo WARNING: Some shortcuts could not be removed automatically.
     echo You may need to manually delete them after the uninstall completes.
 ) else (
-    echo All shortcuts were successfully removed.
+    echo All shortcuts search completed.
 )
 
 REM ===== ASK ABOUT COMPLETE REMOVAL =====
@@ -225,21 +240,51 @@ if /i "!complete_removal!"=="y" (
     if /i "!confirm_removal!"=="y" (
         echo Creating cleanup script...
         
-        REM Create a temporary batch file to delete everything including itself
-        echo @echo off > cleanup_temp.bat
-        echo timeout /t 1 /nobreak > nul >> cleanup_temp.bat
-        echo rmdir /s /q "%~dp0" >> cleanup_temp.bat
+        REM Get the current directory path
+        set "current_dir=%~dp0"
         
-        echo Starting cleanup process...
-        start "" "cleanup_temp.bat"
-        exit
+        REM Create a temporary batch file to delete everything including itself
+        echo @echo off > "%TEMP%\cleanup_meeting_transcriber.bat"
+        echo echo Waiting for uninstaller to close... >> "%TEMP%\cleanup_meeting_transcriber.bat"
+        echo timeout /t 3 /nobreak ^> nul >> "%TEMP%\cleanup_meeting_transcriber.bat"
+        echo echo Removing Meeting Transcriber directory... >> "%TEMP%\cleanup_meeting_transcriber.bat"
+        echo rmdir /s /q "!current_dir!" >> "%TEMP%\cleanup_meeting_transcriber.bat"
+        echo if exist "!current_dir!" ^( >> "%TEMP%\cleanup_meeting_transcriber.bat"
+        echo     echo Some files could not be deleted. Please delete manually: >> "%TEMP%\cleanup_meeting_transcriber.bat"
+        echo     echo !current_dir! >> "%TEMP%\cleanup_meeting_transcriber.bat"
+        echo     pause >> "%TEMP%\cleanup_meeting_transcriber.bat"
+        echo ^) else ^( >> "%TEMP%\cleanup_meeting_transcriber.bat"
+        echo     echo Meeting Transcriber completely removed. >> "%TEMP%\cleanup_meeting_transcriber.bat"
+        echo ^) >> "%TEMP%\cleanup_meeting_transcriber.bat"
+        echo del "%%~f0" >> "%TEMP%\cleanup_meeting_transcriber.bat"
+        
+        echo Starting cleanup process in 3 seconds...
+        echo You can close this window now.
+        start "" "%TEMP%\cleanup_meeting_transcriber.bat"
+        timeout /t 2 /nobreak > nul
+        exit /b 0
     ) else (
         echo Complete removal canceled.
     )
 )
 
 echo.
-echo Uninstall complete!
-echo If you want to completely remove the application, you can delete this folder manually.
+echo ===================================================
+echo Uninstall Process Complete!
+echo ===================================================
 echo.
-pause
+echo Summary of actions performed:
+echo - Shortcuts removed from Desktop and Start Menu
+echo - Configuration files handled
+echo - Virtual environment removed
+echo - Temporary files cleaned up
+echo.
+echo If you want to completely remove the application folder,
+echo you can delete this folder manually or run the uninstaller again
+echo and choose "yes" when asked about complete removal.
+echo.
+echo The uninstaller will close automatically in 10 seconds...
+echo Press any key to close immediately.
+echo.
+timeout /t 10 /nobreak > nul
+echo Uninstaller finished.

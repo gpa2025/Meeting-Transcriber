@@ -7,7 +7,8 @@ This module provides functions to:
 3. Parse and structure the AI responses
 
 Author: Gianpaolo Albanese
-Date: 2024
+Date: 12-15-2025
+Version: 1.1
 """
 
 import os

@@ -8,8 +8,8 @@ that may not be available in newer Python versions.
 Author: Gianpaolo Albanese
 E-Mail: albaneg@yahoo.com
 Work Email: gianpaoa@amazon.com
-Date: 05-09-2024
-Version: 1.0
+Date: 12-15-2025
+Version: 1.1
 Assisted by: Amazon Q for VS Code
 """
 
