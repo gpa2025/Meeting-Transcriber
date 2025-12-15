@@ -928,25 +928,36 @@ class MeetingTranscriberGUI(QMainWindow):
     def show_about(self):
         """Show the About dialog with author information"""
         about_text = """
-        <h2>Meeting Transcriber</h2>
+        <h2>Meeting Transcriber - Standard Edition</h2>
         <p><b>Version:</b> 1.1</p>
         <p><b>Date:</b> 12-15-2025</p>
         <p><b>Author:</b> Gianpaolo Albanese</p>
         <p><b>E-Mail:</b> albaneg@yahoo.com</p>
         <p><b>Work Email:</b> gianpaoa@amazon.com</p>
         <p><b>Assisted by:</b> Amazon Q for VS Code</p>
-        <p>A tool for transcribing meeting audio and generating detailed meeting notes using AWS services.</p>
+        <p>A powerful tool for transcribing meeting audio and generating detailed meeting notes using AWS services and free AI models.</p>
         
-        <h3>What's New in Version 1.1:</h3>
+        <h3>🚀 New in Version 1.1 - Async Features Edition:</h3>
         <ul>
+        <li><b>Dual Version Support:</b> Choose between Standard (this) or Enhanced Async version</li>
+        <li><b>30+ AI Models:</b> Latest AWS Bedrock models + free alternatives (Ollama, HuggingFace)</li>
+        <li><b>Free Models:</b> Complete offline processing with Ollama - no AWS required</li>
         <li><b>Skip Transcription:</b> Use existing transcript files for summarization only</li>
-        <li><b>30+ AI Models:</b> Support for latest AWS Bedrock models + free alternatives</li>
-        <li><b>Free Models:</b> Ollama, Hugging Face, and OpenAI-compatible APIs</li>
         <li><b>Model Management:</b> Add, remove, and update AI models from the UI</li>
-        <li><b>Auto-Cleanup:</b> Deprecated models automatically removed on startup</li>
-        <li><b>Enhanced Settings:</b> .env file sync and improved backup options</li>
-        <li><b>Better Error Handling:</b> Improved retry logic and validation</li>
+        <li><b>Enhanced Settings:</b> Improved configuration and backup options</li>
+        <li><b>Better Error Handling:</b> Robust retry logic and validation</li>
         </ul>
+        
+        <h3>⚡ Want More Power?</h3>
+        <p><b>Try the Enhanced Async Version for:</b></p>
+        <ul>
+        <li>🔄 <b>Multi-task Processing:</b> Handle multiple files simultaneously</li>
+        <li>📊 <b>Real-time Progress:</b> Live progress bars and detailed status updates</li>
+        <li>❌ <b>Task Cancellation:</b> Stop operations anytime with graceful cleanup</li>
+        <li>🖥️ <b>Responsive UI:</b> Never freezes during long operations</li>
+        <li>📋 <b>Professional Interface:</b> Tabbed layout with progress monitoring</li>
+        </ul>
+        <p><i>Install async dependencies: pip install aiohttp aiofiles</i></p>
         """
         
         QMessageBox.about(self, "About Meeting Transcriber", about_text)
