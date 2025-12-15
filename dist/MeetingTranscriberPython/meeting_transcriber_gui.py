@@ -81,8 +81,10 @@ class TranscriptionWorker(QThread):
             os.environ["TRANSCRIPTION_METHOD"] = self.aws_settings["transcription_method"]
             os.environ["OPENAI_COMPATIBLE_KEY"] = self.aws_settings.get("openai_compatible_key", "")
             
-            # Create output directory if it doesn't exist
+            # Create output directory if it doesn't exist (use absolute path)
+            self.output_dir = os.path.abspath(self.output_dir)
             os.makedirs(self.output_dir, exist_ok=True)
+            self.progress_update.emit(f"Using output directory: {self.output_dir}")
             
             # Get base filename without extension
             base_filename = os.path.splitext(os.path.basename(self.audio_file))[0]
@@ -200,12 +202,22 @@ class TranscriptionWorker(QThread):
             # Open output directory
             import subprocess
             import sys
-            if sys.platform == 'win32':
-                subprocess.Popen(['explorer', self.output_dir])
-            elif sys.platform == 'darwin':
-                subprocess.Popen(['open', self.output_dir])
-            else:
-                subprocess.Popen(['xdg-open', self.output_dir])
+            
+            # Normalize the path to ensure it works correctly
+            normalized_output_dir = os.path.abspath(self.output_dir)
+            self.progress_update.emit(f"Opening output directory: {normalized_output_dir}")
+            
+            try:
+                if sys.platform == 'win32':
+                    # Open the folder directly in Windows Explorer
+                    subprocess.Popen(['explorer', normalized_output_dir])
+                elif sys.platform == 'darwin':
+                    subprocess.Popen(['open', normalized_output_dir])
+                else:
+                    subprocess.Popen(['xdg-open', normalized_output_dir])
+            except Exception as folder_error:
+                self.progress_update.emit(f"Could not open folder automatically: {folder_error}")
+                logger.warning(f"Failed to open output directory: {folder_error}")
             
             if self.skip_transcription:
                 self.finished_signal.emit(True, "Summarization completed successfully!\nOutput directory opened.")
@@ -446,7 +458,9 @@ class MeetingTranscriberGUI(QMainWindow):
             self.audio_file_input.setText(file_path)
     
     def browse_output_dir(self):
-        dir_path = QFileDialog.getExistingDirectory(self, "Select Output Directory")
+        # Start from current directory instead of Documents
+        current_dir = os.getcwd()
+        dir_path = QFileDialog.getExistingDirectory(self, "Select Output Directory", current_dir)
         if dir_path:
             self.output_dir_input.setText(dir_path)
     
